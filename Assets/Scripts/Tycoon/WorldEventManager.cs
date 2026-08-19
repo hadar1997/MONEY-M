@@ -72,7 +72,7 @@ namespace Tycoon
                     // already passed, this is just the all-clear. Nothing left to
                     // apply, so onConfirm is a no-op; the button's only job here is
                     // letting the player dismiss it.
-                    game.Hud.ShowEventConfirmation("All Clear", EndText(activeEvent.Value), Color.white, alarm: false, buttonLabel: "OK", onConfirm: null);
+                    game.Hud.QueueEventConfirmation("All Clear", EndText(activeEvent.Value), Color.white, alarm: false, buttonLabel: "OK", onConfirm: null);
                     activeEvent = null;
                     cooldownMonths = CooldownAfterEventMonths;
                 }
@@ -98,7 +98,7 @@ namespace Tycoon
             if (IsPositive(type))
             {
                 int grant = ComputeGrant(type);
-                game.Hud.ShowEventConfirmation(
+                game.Hud.QueueEventConfirmation(
                     EventName(type).ToUpperInvariant() + "!",
                     $"{PositiveText(type)} Claim your {EconomyManager.FormatSigned(grant)}!",
                     EventColor(type), alarm: false,
@@ -107,7 +107,7 @@ namespace Tycoon
             }
             else
             {
-                game.Hud.ShowEventConfirmation(
+                game.Hud.QueueEventConfirmation(
                     EventName(type).ToUpperInvariant() + "!",
                     StartText(type),
                     EventColor(type), alarm: true,

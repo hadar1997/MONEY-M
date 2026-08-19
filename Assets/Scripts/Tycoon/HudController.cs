@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -222,13 +223,36 @@ namespace Tycoon
 
         public bool EventConfirmationOpen => eventBannerPanel != null && eventBannerPanel.activeSelf;
 
+        readonly Queue<Action> announcementQueue = new Queue<Action>();
+
+        /// <summary>Sole public entry point for the full-screen confirmation
+        /// banner - WorldEventManager, AchievementManager, and the daily-reward/
+        /// offline-earnings launch popups all funnel through here instead of
+        /// calling ShowEventConfirmation directly. Without this, two systems
+        /// wanting a banner in the same tick (e.g. a world event firing the
+        /// same month a net-worth milestone is crossed) would have the second
+        /// call silently overwrite the first's text/listener before the player
+        /// ever saw it - this queues it to show right after instead.</summary>
+        public void QueueEventConfirmation(string title, string subtitle, Color accentColor, bool alarm, string buttonLabel, Action onConfirm)
+        {
+            announcementQueue.Enqueue(() => ShowEventConfirmation(title, subtitle, accentColor, alarm, buttonLabel, onConfirm));
+            TryShowNextQueued();
+        }
+
+        void TryShowNextQueued()
+        {
+            if (EventConfirmationOpen || announcementQueue.Count == 0) return;
+            announcementQueue.Dequeue().Invoke();
+        }
+
         /// <summary>Pops in, optionally strobes red a few times to grab attention
         /// (alarm - only for a bad event, never the calmer "gift" ones), then sits
         /// and waits: the event doesn't actually take effect until the player taps
         /// the button, at which point onConfirm runs and the modal fades out.
         /// accentColor tints the background so Storm/War/Plague/Inflation/gifts
-        /// each read as visually distinct, not just by their text.</summary>
-        public void ShowEventConfirmation(string title, string subtitle, Color accentColor, bool alarm, string buttonLabel, Action onConfirm)
+        /// each read as visually distinct, not just by their text. Private - go
+        /// through QueueEventConfirmation instead, so nothing can bypass the queue.</summary>
+        void ShowEventConfirmation(string title, string subtitle, Color accentColor, bool alarm, string buttonLabel, Action onConfirm)
         {
             eventBannerTitle.text = title;
             eventBannerSubtitle.text = subtitle;
@@ -307,12 +331,17 @@ namespace Tycoon
                 yield return null;
             }
             eventBannerPanel.SetActive(false);
+            // Only now is the panel genuinely free - advance the queue here
+            // rather than the moment the button was tapped, since the panel is
+            // still (visually) open for the rest of this fade.
+            TryShowNextQueued();
         }
 
         public void Refresh()
         {
             game.Plots.CheckTierUnlocks();
             game.Market.CheckManagerUnlock();
+            game.Achievements.Check();
             // No "Balance:" label - the gold coin badge and bold styling already
             // say what this pill is, and a bare number reads faster at a glance.
             balanceText.text = EconomyManager.FormatMoney(game.Economy.balance);

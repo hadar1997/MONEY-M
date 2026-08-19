@@ -26,6 +26,8 @@ namespace Tycoon
         public PropertyPopupController Popup { get; private set; }
         public WorldEventManager WorldEvents { get; private set; }
         public SaveManager Save { get; private set; }
+        public AchievementManager Achievements { get; private set; }
+        public DailyRewardManager DailyReward { get; private set; }
 
         // Drag-to-rotate vs. tap-to-select: a press only opens a plot's popup if
         // the pointer never moved past DragThresholdPixels before release: past
@@ -50,6 +52,8 @@ namespace Tycoon
             Popup = gameObject.AddComponent<PropertyPopupController>();
             WorldEvents = gameObject.AddComponent<WorldEventManager>();
             Save = gameObject.AddComponent<SaveManager>();
+            Achievements = gameObject.AddComponent<AchievementManager>();
+            DailyReward = gameObject.AddComponent<DailyRewardManager>();
 
             World.Init(this);
             Economy.Init(this);
@@ -60,6 +64,8 @@ namespace Tycoon
             Popup.Init(this);
             WorldEvents.Init(this);
             Save.Init(this);
+            Achievements.Init(this);
+            DailyReward.Init(this);
 
             // Same build order as the original single-controller Awake().
             World.SetupCamera();
@@ -73,6 +79,33 @@ namespace Tycoon
             Hud.Refresh();
             Calendar.UpdateCalendarDisplay();
             Calendar.ApplyWeather(CalendarManager.WeatherForMonth(Calendar.MonthIndex));
+            ShowLaunchPopups();
+        }
+
+        /// <summary>Retention hooks that only make sense once per app launch:
+        /// "while you were away" earnings (only set if SaveManager just paid
+        /// out, i.e. real time actually passed since the last save) and the
+        /// daily login streak reward. Both funnel through Hud's announcement
+        /// queue, so if both apply they show one after another instead of one
+        /// clobbering the other.</summary>
+        void ShowLaunchPopups()
+        {
+            if (Save.PendingOfflineEarnings > 0)
+            {
+                string duration = SaveManager.FormatDuration(Save.PendingOfflineSeconds);
+                Hud.QueueEventConfirmation("Welcome Back!",
+                    $"While you were away for {duration}, your properties earned {EconomyManager.FormatSigned(Save.PendingOfflineEarnings)}!",
+                    new Color(0.3f, 0.75f, 0.45f), alarm: false, buttonLabel: "Awesome!", onConfirm: null);
+            }
+
+            if (DailyReward.CheckPending())
+            {
+                Hud.QueueEventConfirmation($"Day {DailyReward.PendingStreakDay} Streak!",
+                    "Come back every day for a bigger reward.",
+                    new Color(0.95f, 0.75f, 0.2f), alarm: false,
+                    buttonLabel: $"Claim {EconomyManager.FormatMoney(DailyReward.PendingAmount)}",
+                    onConfirm: () => DailyReward.Claim());
+            }
         }
 
         void Update()

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace Tycoon
@@ -37,6 +38,11 @@ namespace Tycoon
         public int unlockedTierIndex;
 
         public PlotSaveData[] plots;
+
+        /// <summary>Unix time (UTC) this save was written - the only field
+        /// SaveManager reads back against real-world clock time rather than
+        /// game state, used to grant offline earnings on the next load.</summary>
+        public long lastSaveUnixSeconds;
     }
 
     /// <summary>
@@ -52,8 +58,22 @@ namespace Tycoon
         const string SaveKey = "TycoonSave_v1";
         const float AutosaveIntervalSeconds = 20f;
 
+        // Below MinOfflineSecondsToGrant, skip the popup entirely - otherwise
+        // even a quick alt-tab would pop "Welcome Back! +$1" every time, which
+        // reads as noise rather than a reward. Above MaxOfflineSeconds, cap it -
+        // otherwise leaving the app closed for days would hand out an amount
+        // large enough to trivialize the rest of the game's economy.
+        const long MinOfflineSecondsToGrant = 120;
+        const long MaxOfflineSeconds = 8 * 3600;
+
         GameManager game;
         float autosaveTimer;
+
+        /// <summary>Cash granted by LoadGame() for time elapsed since the save
+        /// was written, if any - GameManager reads this once at startup to
+        /// decide whether to show the "Welcome Back" banner.</summary>
+        public int PendingOfflineEarnings { get; private set; }
+        public int PendingOfflineSeconds { get; private set; }
 
         public void Init(GameManager owner)
         {
@@ -61,6 +81,15 @@ namespace Tycoon
         }
 
         public bool HasSave() => PlayerPrefs.HasKey(SaveKey);
+
+        /// <summary>"3h 24m" / "45m" - for the Welcome Back banner only.</summary>
+        public static string FormatDuration(int seconds)
+        {
+            int hours = seconds / 3600;
+            int minutes = (seconds % 3600) / 60;
+            if (hours > 0) return minutes > 0 ? $"{hours}h {minutes}m" : $"{hours}h";
+            return minutes > 0 ? $"{minutes}m" : "under a minute";
+        }
 
         /// <summary>Called once a frame from GameManager.Update().</summary>
         public void Tick()
@@ -113,6 +142,8 @@ namespace Tycoon
 
                 unlockedTierIndex = game.Plots.UnlockedTierIndex,
                 plots = plotData,
+
+                lastSaveUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
             };
 
             PlayerPrefs.SetString(SaveKey, JsonUtility.ToJson(data));
@@ -124,6 +155,9 @@ namespace Tycoon
         /// them.</summary>
         public void LoadGame()
         {
+            PendingOfflineEarnings = 0;
+            PendingOfflineSeconds = 0;
+
             var data = JsonUtility.FromJson<GameSaveData>(PlayerPrefs.GetString(SaveKey));
             if (data == null) return;
 
@@ -144,6 +178,32 @@ namespace Tycoon
                 game.Plots.RestorePlot(i, def, (PropertyOwnership)p.ownership, p.marketValue,
                     p.purchasePrice, p.lockedRent, p.leaseMonthsRemaining, p.lastDeltaPositive, p.expirySecondsRemaining);
             }
+
+            GrantOfflineEarnings(data.lastSaveUnixSeconds);
+        }
+
+        /// <summary>Pays out what your leased properties would have earned had
+        /// the game kept running at 1x speed for however long the app was
+        /// closed (capped - see MaxOfflineSeconds), then leaves the amount in
+        /// PendingOfflineEarnings for GameManager to announce. Doesn't touch
+        /// the calendar, leases, or market at all - only cash changes, so
+        /// there's no risk of e.g. a lease silently expiring or a world event
+        /// firing while nobody was there to see it.</summary>
+        void GrantOfflineEarnings(long savedUnixSeconds)
+        {
+            if (savedUnixSeconds <= 0) return; // pre-existing save from before this field existed
+            long elapsed = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - savedUnixSeconds;
+            if (elapsed < MinOfflineSecondsToGrant) return;
+
+            int cappedSeconds = (int)Math.Min(elapsed, MaxOfflineSeconds);
+            float perSecondRate = game.Market.ComputeMonthlyPassiveIncome() / game.Calendar.secondsPerMonth;
+            int amount = Mathf.RoundToInt(perSecondRate * cappedSeconds);
+            if (amount <= 0) return; // nothing leased out - nothing to grant
+
+            game.Economy.balance += amount;
+            game.Economy.sessionProfit += amount;
+            PendingOfflineEarnings = amount;
+            PendingOfflineSeconds = cappedSeconds;
         }
 
         void OnApplicationPause(bool pauseStatus)
