@@ -263,8 +263,12 @@ namespace Tycoon
             eventConfirmButton.onClick.RemoveAllListeners();
             eventConfirmButton.onClick.AddListener(() =>
             {
-                onConfirm?.Invoke();
-                HideEventConfirmation();
+                // try/finally: if onConfirm throws (e.g. a bug in whatever it
+                // grants), the banner must still close - an exception here used
+                // to abort the rest of this listener, leaving the modal stuck
+                // on screen forever with no way to dismiss it.
+                try { onConfirm?.Invoke(); }
+                finally { HideEventConfirmation(); }
             });
 
             if (eventBannerRoutine != null) StopCoroutine(eventBannerRoutine);
