@@ -148,8 +148,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0aac392a568cf9245b16b7ae8bec5675, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Tycoon.GameManager
-  missionTarget: 2000
-  missionTimeSeconds: 300
 --- !u!4 &169583705
 Transform:
   m_ObjectHideFlags: 0

@@ -11,6 +11,12 @@ namespace Tycoon
         House,
         Apartment,
         Tower,
-        Skyscraper
+        Skyscraper,
+        // Commercial/business tiers beyond residential, so wealth always has
+        // somewhere further to climb instead of capping out at Skyscraper.
+        Commercial,
+        Office,
+        Corporate,
+        MegaComplex
     }
 }

@@ -12,6 +12,13 @@ namespace Tycoon
         /// <summary>Monthly rent cost as a fraction of current market value (e.g. 0.05 = 5%/month).</summary>
         public float rentRateFraction = 0.05f;
 
+        /// <summary>Rounded rent, floored at $1 - a depressed-enough property
+        /// (marketValue can crash toward MarketManager's own $1 floor during a
+        /// Plague/Crash) would otherwise round down to a nonsensical $0/mo lease.
+        /// Shared by both PropertyPopupController call sites (the popup's shown
+        /// price and SignLease's actual charge) so they can never disagree.</summary>
+        public int ComputeMonthlyRent(float marketValue) => Mathf.Max(1, Mathf.RoundToInt(marketValue * rentRateFraction));
+
         /// <summary>Net worth at which the Property Manager upgrade unlocks and starts
         /// auto-renewing expired leases at the current market rate instead of leaving
         /// them parked in NeedsDecision until the player taps them.</summary>
@@ -162,6 +169,16 @@ namespace Tycoon
         {
             if (!ManagerUnlocked && game.Economy.ComputeNetWorth() >= managerUnlockNetWorth)
                 ManagerUnlocked = true;
+        }
+
+        public int TrendMonthsRemaining => trendMonthsRemaining;
+
+        /// <summary>For SaveManager only.</summary>
+        public void RestoreState(MarketTrend savedTrend, int savedTrendMonthsRemaining, bool savedManagerUnlocked)
+        {
+            CurrentTrend = savedTrend;
+            trendMonthsRemaining = savedTrendMonthsRemaining;
+            ManagerUnlocked = savedManagerUnlocked;
         }
     }
 }

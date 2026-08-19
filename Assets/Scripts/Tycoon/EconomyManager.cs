@@ -8,7 +8,7 @@ namespace Tycoon
     /// </summary>
     public class EconomyManager : MonoBehaviour
     {
-        public int startingBalance = 100;
+        public int startingBalance = 2000;
         public int balance;
         public int sessionProfit;
 

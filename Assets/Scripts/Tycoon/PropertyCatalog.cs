@@ -25,6 +25,13 @@ namespace Tycoon
                 Make("Apartment Tower", PropertyTier.Tower, 2200),
                 Make("Luxury Tower", PropertyTier.Tower, 4800),
                 Make("Skyscraper", PropertyTier.Skyscraper, 10000),
+                // Commercial/business tiers past Skyscraper - keeps the same
+                // ~2.2x-per-tier curve as the residential ladder above, so
+                // wealth always has somewhere further to climb.
+                Make("Retail Plaza", PropertyTier.Commercial, 22000),
+                Make("Office Tower", PropertyTier.Office, 48000),
+                Make("Corporate HQ", PropertyTier.Corporate, 105000),
+                Make("Mega Complex", PropertyTier.MegaComplex, 230000),
             };
         }
 

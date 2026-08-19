@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -26,6 +27,7 @@ namespace Tycoon
         Light sunLight;
         Renderer groundRenderer;
         float ambientClock;
+        float cameraYaw;
 
         GameManager game;
 
@@ -38,6 +40,18 @@ namespace Tycoon
         // Camera / lighting / post-processing
         // ---------------------------------------------------------------
 
+        /// <summary>Same size formula BuildGroundAndRoads uses for the ground
+        /// plane, extracted so SetupCamera can size itself around it too -
+        /// SetupCamera runs before the ground GameObject exists, so it can't
+        /// just read the ground's actual size back.</summary>
+        static float ComputeGroundSize()
+        {
+            float mapWidth = (PlotManager.Columns - 1) * PlotManager.CellSpacing;
+            float mapDepth = (PlotManager.Rows - 1) * PlotManager.CellSpacing;
+            const float margin = 2.4f;
+            return Mathf.Max(mapWidth, mapDepth) + margin;
+        }
+
         public void SetupCamera()
         {
             MapCamera = Camera.main;
@@ -47,13 +61,49 @@ namespace Tycoon
                 camGO.tag = "MainCamera";
                 MapCamera = camGO.AddComponent<Camera>();
             }
+
+            // Target platform is phones, portrait - lock it so the aspect-based
+            // sizing below (and the whole portrait HUD layout) can't be thrown
+            // off by an unexpected rotation. Editor Game view aspect is whatever
+            // the Game tab is set to; pick a phone/portrait preset there to
+            // preview this accurately.
+            Screen.orientation = ScreenOrientation.Portrait;
+
             MapCamera.orthographic = true;
-            MapCamera.orthographicSize = orthographicSize;
             MapCamera.nearClipPlane = 0.1f;
             MapCamera.farClipPlane = 30f;
             MapCamera.clearFlags = CameraClearFlags.SolidColor;
             MapCamera.backgroundColor = new Color(0.8f, 0.86f, 0.9f);
-            MapCamera.transform.rotation = Quaternion.Euler(cameraEuler);
+
+            // orthographicSize is the camera's vertical half-extent; the
+            // horizontal half-extent is orthographicSize * aspect. On a portrait
+            // phone (aspect < 1) horizontal is the tighter constraint, so solving
+            // for "the square ground must fit both ways" needs dividing by the
+            // aspect, not just using the inspector's fixed default - otherwise a
+            // square map ends up horizontally cropped on any screen narrower
+            // than it is tall.
+            float aspect = Screen.width / (float)Screen.height;
+            float requiredHalfExtent = ComputeGroundSize() / 2f * 1.15f; // some breathing room
+            orthographicSize = requiredHalfExtent / Mathf.Min(1f, aspect);
+            MapCamera.orthographicSize = orthographicSize;
+
+            cameraYaw = cameraEuler.y;
+            ApplyCameraOrbit();
+        }
+
+        /// <summary>Orbits the camera horizontally around the map's center at a
+        /// fixed pitch and distance - lets the player drag to see every building
+        /// from any angle instead of being locked to one fixed isometric view.
+        /// Called from GameManager's drag handling.</summary>
+        public void RotateCamera(float deltaYawDegrees)
+        {
+            cameraYaw += deltaYawDegrees;
+            ApplyCameraOrbit();
+        }
+
+        void ApplyCameraOrbit()
+        {
+            MapCamera.transform.rotation = Quaternion.Euler(cameraEuler.x, cameraYaw, cameraEuler.z);
             MapCamera.transform.position = -MapCamera.transform.forward * cameraDistance;
         }
 
@@ -67,13 +117,23 @@ namespace Tycoon
             RenderSettings.ambientLight = new Color(0.92f, 0.9f, 0.85f);
 
             var light = FindAnyObjectByType<Light>();
-            if (light != null && light.type == LightType.Directional)
+            if (light == null || light.type != LightType.Directional)
             {
-                light.shadows = LightShadows.None;
-                light.color = new Color(1f, 0.96f, 0.85f); // warm sunlight, not neutral white
-                if (light.intensity < SunBaseIntensity) light.intensity = SunBaseIntensity;
-                sunLight = light;
+                // TycoonScene ships with no light of its own - without this, the
+                // warm tint/intensity below (and TickAmbient's breathing) never
+                // had anything to drive, and every cube face was lit by flat
+                // ambient alone with no highlight for bloom to catch.
+                var sunGO = new GameObject("Sun");
+                sunGO.transform.SetParent(transform, false);
+                sunGO.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+                light = sunGO.AddComponent<Light>();
+                light.type = LightType.Directional;
             }
+
+            light.shadows = LightShadows.None;
+            light.color = new Color(1f, 0.96f, 0.85f); // warm sunlight, not neutral white
+            if (light.intensity < SunBaseIntensity) light.intensity = SunBaseIntensity;
+            sunLight = light;
         }
 
         /// <summary>Very slow, barely-perceptible drift so the scene doesn't read
@@ -116,9 +176,9 @@ namespace Tycoon
             bloom.intensity.Override(0.32f);
 
             var color = profile.Add<ColorAdjustments>(true);
-            color.saturation.Override(16f);
-            color.contrast.Override(10f);
-            color.postExposure.Override(0.08f);
+            color.saturation.Override(22f); // pushed further for a livelier, more "candy" look
+            color.contrast.Override(11f);
+            color.postExposure.Override(0.1f);
 
             var whiteBalance = profile.Add<WhiteBalance>(true);
             whiteBalance.temperature.Override(6f); // a hair warmer across the board
@@ -160,11 +220,17 @@ namespace Tycoon
 
             // Ground is a grassy border around the plot grid, sized off the grid's
             // own dimensions (not a fixed constant) so it keeps framing the board
-            // snugly however many rows/columns PlotManager ends up with.
-            const float margin = 2.4f;
+            // snugly however many rows/columns PlotManager ends up with. Always
+            // square (side = the larger of width/depth + margin), not stretched
+            // to the grid's actual (non-square, e.g. 4x3) aspect ratio - a
+            // rectangular ground visibly changes shape as the camera orbits
+            // around it, while a square reads as consistent from any angle.
+            // Same formula SetupCamera used to size the frustum around, via
+            // ComputeGroundSize() - kept in one place so they can't drift apart.
             const float planeBaseSize = 10f; // Unity's default Plane primitive is 10x10 at scale 1
+            float groundSize = ComputeGroundSize();
             var ground = CreatePrimitiveChild(mapRoot, PrimitiveType.Plane, new Color(0.4f, 0.66f, 0.35f), Vector3.zero,
-                new Vector3((mapWidth + margin) / planeBaseSize, 1f, (mapDepth + margin) / planeBaseSize));
+                new Vector3(groundSize / planeBaseSize, 1f, groundSize / planeBaseSize));
             groundRenderer = ground.GetComponent<Renderer>();
             var groundMat = groundRenderer.material;
             groundMat.mainTexture = CreateGroundTexture();
@@ -172,7 +238,7 @@ namespace Tycoon
             // fixed tile count, so the grass doesn't stretch/squash as the ground
             // resizes with the grid.
             const float tilesPerUnit = 0.82f;
-            groundMat.mainTextureScale = new Vector2((mapWidth + margin) * tilesPerUnit, (mapDepth + margin) * tilesPerUnit);
+            groundMat.mainTextureScale = new Vector2(groundSize * tilesPerUnit, groundSize * tilesPerUnit);
 
             for (int col = 0; col < PlotManager.Columns - 1; col++)
             {
@@ -184,6 +250,53 @@ namespace Tycoon
                 float z = -mapDepth / 2f + PlotManager.CellSpacing / 2f + row * PlotManager.CellSpacing;
                 BuildRoadStrip(mapRoot, new Vector3(0f, 0f, z), false, mapWidth + 1.6f);
             }
+
+            CreateSirens(mapRoot, mapWidth, mapDepth);
+        }
+
+        readonly List<SirenLight> sirens = new List<SirenLight>();
+
+        /// <summary>Six warning sirens ringing the plot grid - four corners plus
+        /// front/back midpoints, sitting in the grassy border outside the plots so
+        /// they never clash with a building. Positioned off mapWidth/mapDepth
+        /// (not fixed coordinates), same as the ground/roads above, so they keep
+        /// framing the board correctly whatever PlotManager.Columns/Rows end up
+        /// being.</summary>
+        void CreateSirens(Transform mapRoot, float mapWidth, float mapDepth)
+        {
+            float bx = mapWidth / 2f + 0.65f;
+            float bz = mapDepth / 2f + 0.65f;
+            Vector3[] positions =
+            {
+                new Vector3(-bx, 0, -bz), new Vector3(bx, 0, -bz),
+                new Vector3(-bx, 0, bz), new Vector3(bx, 0, bz),
+                new Vector3(0, 0, -bz), new Vector3(0, 0, bz),
+            };
+
+            sirens.Clear();
+            foreach (var pos in positions)
+                sirens.Add(CreateSiren(mapRoot, pos));
+        }
+
+        SirenLight CreateSiren(Transform mapRoot, Vector3 localPos)
+        {
+            var root = new GameObject("Siren");
+            root.transform.SetParent(mapRoot, false);
+            root.transform.localPosition = localPos;
+
+            CreatePrimitiveChild(root.transform, PrimitiveType.Cube, new Color(0.28f, 0.27f, 0.26f), new Vector3(0, 0.18f, 0), new Vector3(0.045f, 0.36f, 0.045f)); // pole
+            var lamp = CreatePrimitiveChild(root.transform, PrimitiveType.Cube, new Color(0.3f, 0.08f, 0.06f), new Vector3(0, 0.4f, 0), new Vector3(0.1f, 0.1f, 0.1f)); // lamp head, starts idle-dim
+
+            return lamp.gameObject.AddComponent<SirenLight>();
+        }
+
+        /// <summary>Called by WorldEventManager the moment a new world event
+        /// triggers - every siren strobes bright red for the announcement's
+        /// duration, then settles back to idle-dim.</summary>
+        public void FlashSirens(float duration)
+        {
+            foreach (var siren in sirens)
+                if (siren != null) siren.Flash(duration);
         }
 
         void BuildRoadStrip(Transform mapRoot, Vector3 center, bool vertical, float length)
@@ -348,8 +461,12 @@ namespace Tycoon
         {
             if (view.GetComponent<BoxCollider>() != null) return;
             var box = view.gameObject.AddComponent<BoxCollider>();
-            box.center = new Vector3(0, 1.5f, 0);
-            box.size = new Vector3(1.4f, 3f, 1.4f);
+            // Tall enough to cover the tallest tier's actual roofline (Mega
+            // Complex peaks at ~3.34, see BuildingTopY) with margin - a shorter
+            // box here used to make clicks near the very top of the two priciest
+            // tiers miss the collider entirely.
+            box.center = new Vector3(0, 1.8f, 0);
+            box.size = new Vector3(1.5f, 3.6f, 1.5f);
         }
 
         /// <summary>Y of the highest point of a tier's roof - lets the price tag
@@ -376,6 +493,7 @@ namespace Tycoon
             tagGO.transform.localPosition = new Vector3(0, BuildingTopY(def) + 0.32f, 0);
             tagGO.transform.rotation = MapCamera.transform.rotation;
             tagGO.transform.localScale = Vector3.one * 0.01f; // UI pixels -> ~world units
+            tagGO.AddComponent<Billboard>().Init(MapCamera.transform); // keeps facing the camera as it orbits
 
             var canvas = tagGO.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
@@ -562,6 +680,10 @@ namespace Tycoon
                 case PropertyTier.Apartment: return new Color(0.35f, 0.55f, 0.78f);
                 case PropertyTier.Tower: return new Color(0.42f, 0.46f, 0.56f);
                 case PropertyTier.Skyscraper: return new Color(0.25f, 0.58f, 0.66f);
+                case PropertyTier.Commercial: return new Color(0.85f, 0.45f, 0.3f);
+                case PropertyTier.Office: return new Color(0.3f, 0.4f, 0.52f);
+                case PropertyTier.Corporate: return new Color(0.22f, 0.28f, 0.48f);
+                case PropertyTier.MegaComplex: return new Color(0.65f, 0.55f, 0.22f);
                 default: return Color.gray;
             }
         }
@@ -590,12 +712,24 @@ namespace Tycoon
             return worldShader;
         }
 
+        static readonly Dictionary<Color, Material> materialCache = new Dictionary<Color, Material>();
+
+        /// <summary>Shared per-color, not a fresh instance per part - every building
+        /// rebuild (reroll, sale, tier-up) used to allocate a dozen-plus throwaway
+        /// Materials, which is exactly the kind of steady GC churn that shows up as
+        /// a hitch during otherwise-smooth animations. Safe to share: nothing reads
+        /// these back except PropertyTileView.statusPlate, which already forces its
+        /// own private instance the moment it touches `.material` (standard Unity
+        /// behavior), so it can never bleed a status-tint into a shared building part.</summary>
         static Material MakeMaterial(Color color)
         {
+            if (materialCache.TryGetValue(color, out var cached)) return cached;
+
             var mat = new Material(GetWorldShader());
             mat.color = color;
             if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.28f);
             else if (mat.HasProperty("_Glossiness")) mat.SetFloat("_Glossiness", 0.28f);
+            materialCache[color] = mat;
             return mat;
         }
 
@@ -609,13 +743,32 @@ namespace Tycoon
         /// through repetition.</summary>
         public void SpawnFloatingIndicator(PropertyState state, string label, Color color, bool coinPop = false)
         {
-            var go = new GameObject("FloatingIncome");
             // Parented to the stable Map root, not the building itself: the
             // building's children get wiped by RebuildBuildingMesh whenever the
             // plot re-rolls or sells, which would destroy this mid-animation.
-            go.transform.SetParent(state.view.transform.parent, false);
-            go.transform.position = state.view.transform.position + Vector3.up * 1.6f;
+            var parent = state.view.transform.parent;
+            var basePos = state.view.transform.position;
+            SpawnFloatingText(parent, basePos + Vector3.up * 1.6f, label, color);
+            if (coinPop) SpawnCoinPop(parent, basePos + Vector3.up * 1.2f);
+        }
+
+        /// <summary>For world events that hand out cash without being tied to any
+        /// specific plot (Birthday Gift, Inheritance, ...) - same floating text +
+        /// coin pop as a property-driven indicator, just anchored at the map's
+        /// center instead of a building.</summary>
+        public void SpawnCashEventEffect(string label, Color color)
+        {
+            SpawnFloatingText(transform, new Vector3(0f, 1.6f, 0f), label, color);
+            SpawnCoinPop(transform, new Vector3(0f, 1.2f, 0f));
+        }
+
+        void SpawnFloatingText(Transform parent, Vector3 worldPos, string label, Color color)
+        {
+            var go = new GameObject("FloatingIncome");
+            go.transform.SetParent(parent, false);
+            go.transform.position = worldPos;
             go.transform.rotation = MapCamera.transform.rotation;
+            go.AddComponent<Billboard>().Init(MapCamera.transform);
 
             var tm = go.AddComponent<TextMesh>();
             tm.text = label;
@@ -626,8 +779,6 @@ namespace Tycoon
             tm.alignment = TextAlignment.Center;
 
             StartCoroutine(AnimateFloatingIndicator(go.transform, tm));
-
-            if (coinPop) SpawnCoinPop(state);
         }
 
         static Texture2D coinTexture;
@@ -658,16 +809,18 @@ namespace Tycoon
         /// <summary>A handful of small gold quads arcing up and out under gravity -
         /// reinforces "cash just landed" alongside the floating +$ text instead of
         /// leaving text as the only feedback for the moments that matter most.</summary>
-        void SpawnCoinPop(PropertyState state)
+        void SpawnCoinPop(Transform parent, Vector3 origin)
         {
-            var origin = state.view.transform.position + Vector3.up * 1.2f;
             int count = Random.Range(3, 5);
             for (int i = 0; i < count; i++)
             {
                 var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
                 Destroy(go.GetComponent<Collider>());
-                go.transform.SetParent(state.view.transform.parent, false);
+                go.transform.SetParent(parent, false);
                 go.transform.position = origin;
+                // No Billboard here (unlike the price tag/floating text) -
+                // AnimateCoin spins this on its own every frame, and a
+                // camera-facing LateUpdate would fight with and erase that spin.
                 go.transform.rotation = MapCamera.transform.rotation;
                 go.transform.localScale = Vector3.one * 0.09f;
                 go.GetComponent<Renderer>().material = GetCoinMaterial();

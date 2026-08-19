@@ -102,7 +102,7 @@ namespace Tycoon
                 int sellPrice = Mathf.RoundToInt(state.marketValue);
                 int diff = sellPrice - state.purchasePrice;
                 string diffText = diff >= 0 ? $"profit {EconomyManager.FormatSigned(diff)}" : $"loss {EconomyManager.FormatMoney(diff)}";
-                int monthlyRent = Mathf.RoundToInt(state.marketValue * game.Market.rentRateFraction);
+                int monthlyRent = game.Market.ComputeMonthlyRent(state.marketValue);
 
                 popupTitle.text = needsDecision
                     ? $"{def.displayName} - lease ended, worth {EconomyManager.FormatMoney(sellPrice)} ({diffText})"
@@ -199,7 +199,7 @@ namespace Tycoon
         {
             var state = game.Plots.plots[index];
             var def = state.definition;
-            int monthlyRent = Mathf.RoundToInt(state.marketValue * game.Market.rentRateFraction);
+            int monthlyRent = game.Market.ComputeMonthlyRent(state.marketValue);
 
             state.ownership = PropertyOwnership.Rented;
             // Locked in for the whole lease term - PayMonthlyRent pays out this

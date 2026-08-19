@@ -8,7 +8,7 @@ namespace Tycoon
         Unowned,
         Rented,
         Owned,
-        /// <summary>Rental period ended; player must buy, renew, or abandon.</summary>
+        /// <summary>Lease ended; player must renew, sell, or keep holding bare.</summary>
         NeedsDecision
     }
 }

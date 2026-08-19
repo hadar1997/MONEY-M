@@ -9,7 +9,10 @@ namespace Tycoon
     /// </summary>
     public class CalendarManager : MonoBehaviour
     {
-        public float secondsPerMonth = 5f;
+        // Time.deltaTime is scaled by Time.timeScale (the speed buttons), so this
+        // one real-seconds value automatically gives 30s/month at 1x, 15s at 2x,
+        // 10s at 3x - no separate per-speed tuning needed.
+        public float secondsPerMonth = 30f;
 
         static readonly string[] MonthNames =
         {
@@ -20,7 +23,7 @@ namespace Tycoon
         public enum WeatherType { Sunny, Cloudy, Rainy }
 
         int monthIndex; // 0 = January
-        int yearNumber = 2026;
+        int yearNumber = 0;
         float monthTimer;
         WeatherType currentWeather = WeatherType.Sunny;
         ParticleSystem rainParticles;
@@ -48,12 +51,16 @@ namespace Tycoon
             ApplyWeather(WeatherForMonth(monthIndex));
             game.Market.PayMonthlyRent();
             game.Market.FluctuateMarket();
-            game.Hud.Refresh(); // after both, so the dashboard shows this month's trend, not last month's
+            game.WorldEvents.Tick(); // layers its bias on top of this month's ambient drift, after it
+            game.Hud.Refresh(); // after all three, so the dashboard shows this month's trend/event, not last month's
         }
 
         public void UpdateCalendarDisplay()
         {
-            game.Hud.calendarText.text = $"{MonthNames[monthIndex]}, Year {yearNumber} · {WeatherForMonth(monthIndex)}";
+            // Short form for the compact top-bar pill - weather is already shown
+            // in the 3D scene itself (rain, lighting), so it doesn't need to be
+            // spelled out in text here too.
+            game.Hud.calendarText.text = $"{MonthNames[monthIndex].Substring(0, 3)} · Y{yearNumber}";
         }
 
         public static WeatherType WeatherForMonth(int month)
@@ -121,5 +128,18 @@ namespace Tycoon
 
         public WeatherType CurrentWeather => currentWeather;
         public int MonthIndex => monthIndex;
+        public int YearNumber => yearNumber;
+        public float MonthTimer => monthTimer;
+
+        /// <summary>For SaveManager only - restores the clock to a saved point
+        /// without re-firing PayMonthlyRent/FluctuateMarket/WorldEvents.Tick()
+        /// (those already ran, back when this month first advanced, before the
+        /// save happened).</summary>
+        public void RestoreState(int savedMonthIndex, int savedYearNumber, float savedMonthTimer)
+        {
+            monthIndex = savedMonthIndex;
+            yearNumber = savedYearNumber;
+            monthTimer = savedMonthTimer;
+        }
     }
 }
