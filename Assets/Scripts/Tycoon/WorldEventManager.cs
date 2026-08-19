@@ -60,7 +60,11 @@ namespace Tycoon
             // speed, where a month can pass in under 2 seconds) could have a
             // second event roll and silently overwrite the first one's modal -
             // same text fields, same button listener - before they ever saw it.
-            if (game.Hud.EventConfirmationOpen) return;
+            // Also deferred while Settings is open - a "WAR!" banner popping up
+            // full-screen over the settings menu the player is actively
+            // browsing would be jarring, and Settings has no queue of its own
+            // to defer behind.
+            if (game.Hud.EventConfirmationOpen || game.Settings.IsOpen) return;
 
             if (activeEvent.HasValue)
             {

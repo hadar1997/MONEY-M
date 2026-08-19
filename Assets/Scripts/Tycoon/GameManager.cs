@@ -28,6 +28,7 @@ namespace Tycoon
         public SaveManager Save { get; private set; }
         public AchievementManager Achievements { get; private set; }
         public DailyRewardManager DailyReward { get; private set; }
+        public SettingsController Settings { get; private set; }
 
         // Drag-to-rotate vs. tap-to-select: a press only opens a plot's popup if
         // the pointer never moved past DragThresholdPixels before release: past
@@ -54,6 +55,7 @@ namespace Tycoon
             Save = gameObject.AddComponent<SaveManager>();
             Achievements = gameObject.AddComponent<AchievementManager>();
             DailyReward = gameObject.AddComponent<DailyRewardManager>();
+            Settings = gameObject.AddComponent<SettingsController>();
 
             World.Init(this);
             Economy.Init(this);
@@ -66,6 +68,7 @@ namespace Tycoon
             Save.Init(this);
             Achievements.Init(this);
             DailyReward.Init(this);
+            Settings.Init(this);
 
             // Same build order as the original single-controller Awake().
             World.SetupCamera();
@@ -74,6 +77,7 @@ namespace Tycoon
             Calendar.CreateRainParticles();
             Hud.Build();
             Popup.Build();
+            Settings.Build();
             Plots.InitWorld(); // always builds every plot's mesh/view fresh first...
             if (Save.HasSave()) Save.LoadGame(); // ...then a save, if one exists, overwrites the state on top
             Hud.Refresh();

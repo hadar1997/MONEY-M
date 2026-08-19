@@ -32,6 +32,13 @@ namespace Tycoon
             game = owner;
         }
 
+        /// <summary>For SettingsController's Reset Game only.</summary>
+        public static void DeleteProgress()
+        {
+            PlayerPrefs.DeleteKey(StreakKey);
+            PlayerPrefs.DeleteKey(LastClaimDateKey);
+        }
+
         /// <summary>Call once at startup, after any save has already been
         /// loaded (the reward scales off net worth, which needs the restored
         /// plot state to be meaningful). Returns true if today's reward hasn't

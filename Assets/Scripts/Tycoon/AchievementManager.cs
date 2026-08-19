@@ -49,6 +49,9 @@ namespace Tycoon
             unlockedCount = PlayerPrefs.GetInt(UnlockedCountKey, 0);
         }
 
+        /// <summary>For SettingsController's Reset Game only.</summary>
+        public static void DeleteProgress() => PlayerPrefs.DeleteKey(UnlockedCountKey);
+
         /// <summary>Unlocks (at most) one milestone per call, so a single big
         /// windfall that jumps several thresholds at once celebrates each one
         /// in turn on the next few Refresh() calls instead of skipping

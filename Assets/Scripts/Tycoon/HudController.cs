@@ -140,7 +140,7 @@ namespace Tycoon
         // taller, 1920-reference) portrait canvas, within thumb reach on a
         // phone - the old y=-480 only made sense on the old 1080-tall
         // reference, where it was already near the bottom edge.
-        const float BottomRowY = -840f;
+        public const float BottomRowY = -840f;
 
         void BuildSpeedControls(Transform root)
         {

@@ -82,6 +82,9 @@ namespace Tycoon
 
         public bool HasSave() => PlayerPrefs.HasKey(SaveKey);
 
+        /// <summary>For SettingsController's Reset Game only.</summary>
+        public static void DeleteSave() => PlayerPrefs.DeleteKey(SaveKey);
+
         /// <summary>"3h 24m" / "45m" - for the Welcome Back banner only.</summary>
         public static string FormatDuration(int seconds)
         {
