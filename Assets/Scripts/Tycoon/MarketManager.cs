@@ -59,7 +59,7 @@ namespace Tycoon
                 game.Economy.balance += net;
                 game.Economy.sessionProfit += net;
 
-                game.World.SpawnFloatingIndicator(state, EconomyManager.FormatSigned(net), GainColor);
+                game.World.SpawnFloatingIndicator(state, EconomyManager.FormatSigned(net), GainColor, coinPop: true);
 
                 state.leaseMonthsRemaining--;
                 if (state.leaseMonthsRemaining <= 0)

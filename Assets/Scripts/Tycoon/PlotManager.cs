@@ -143,10 +143,12 @@ namespace Tycoon
                     pillColor = ExpiredPillColor;
                     break;
             }
+            bool changed = state.view.priceTagText.text != text;
             state.view.priceTagText.text = text;
             state.view.priceTagPill.color = pillColor;
             state.view.priceTagBadge.color = state.lastDeltaPositive ? TrendUpColor : TrendDownColor;
             state.view.priceTagArrow.text = state.lastDeltaPositive ? "▲" : "▼";
+            if (changed) state.view.PulsePriceTag();
         }
     }
 }

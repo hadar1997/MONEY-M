@@ -235,6 +235,11 @@ namespace Tycoon
 
             game.Economy.balance += sellPrice;
             game.Economy.sessionProfit += sellPrice - state.purchasePrice;
+            // Sale proceeds land in your pocket the moment the popup closes, so
+            // this is exactly the kind of cash-in-pocket moment coinPop is for -
+            // fired before RerollPlot rebuilds the mesh underneath it (the
+            // indicator itself is parented to the stable Map root, so it survives).
+            game.World.SpawnFloatingIndicator(state, EconomyManager.FormatSigned(sellPrice), new Color(0.3f, 0.9f, 0.4f), coinPop: true);
             state.ownership = PropertyOwnership.Unowned;
             game.Plots.RerollPlot(state);
             game.Hud.Refresh();

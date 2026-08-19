@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -25,6 +26,7 @@ namespace Tycoon
         public Text priceTagText;
 
         PropertyState state;
+        Coroutine pulseRoutine;
 
         public void Bind(PropertyState propertyState)
         {
@@ -46,6 +48,36 @@ namespace Tycoon
                 default: c = new Color(0.55f, 0.55f, 0.5f); break;
             }
             statusPlate.material.color = c;
+        }
+
+        /// <summary>Brief scale-punch on the price pill - called only when
+        /// PlotManager.RefreshPriceLabel detects the displayed text actually
+        /// changed, so a silent number swap becomes a noticeable "the market
+        /// moved" beat instead of players having to notice the digits changed
+        /// on their own.</summary>
+        public void PulsePriceTag()
+        {
+            if (priceTagPill == null || !gameObject.activeInHierarchy) return;
+            if (pulseRoutine != null) StopCoroutine(pulseRoutine);
+            pulseRoutine = StartCoroutine(PricePulseRoutine());
+        }
+
+        IEnumerator PricePulseRoutine()
+        {
+            var rt = priceTagPill.rectTransform;
+            const float duration = 0.18f;
+            const float peak = 1.18f;
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime; // reads while paused, like the popup punch-scale
+                float p = Mathf.Clamp01(elapsed / duration);
+                float scale = p < 0.5f ? Mathf.Lerp(1f, peak, p / 0.5f) : Mathf.Lerp(peak, 1f, (p - 0.5f) / 0.5f);
+                rt.localScale = Vector3.one * scale;
+                yield return null;
+            }
+            rt.localScale = Vector3.one;
+            pulseRoutine = null;
         }
     }
 }

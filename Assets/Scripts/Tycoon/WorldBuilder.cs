@@ -22,6 +22,11 @@ namespace Tycoon
         public Camera MapCamera { get; private set; }
         static Shader worldShader;
 
+        const float SunBaseIntensity = 1.35f;
+        Light sunLight;
+        Renderer groundRenderer;
+        float ambientClock;
+
         GameManager game;
 
         public void Init(GameManager owner)
@@ -66,7 +71,30 @@ namespace Tycoon
             {
                 light.shadows = LightShadows.None;
                 light.color = new Color(1f, 0.96f, 0.85f); // warm sunlight, not neutral white
-                if (light.intensity < 1.35f) light.intensity = 1.35f;
+                if (light.intensity < SunBaseIntensity) light.intensity = SunBaseIntensity;
+                sunLight = light;
+            }
+        }
+
+        /// <summary>Very slow, barely-perceptible drift so the scene doesn't read
+        /// as a static screenshot over a long idle session: the sun's intensity
+        /// breathes a couple percent and the ground texture creeps sideways.
+        /// Called once a frame from GameManager.Update(), same as every other
+        /// ongoing per-frame system in this game (Calendar.Tick(),
+        /// Plots.UpdatePlotExpiry() etc.) rather than a Unity Update() of its own.</summary>
+        public void TickAmbient()
+        {
+            ambientClock += Time.deltaTime;
+
+            if (sunLight != null)
+                sunLight.intensity = SunBaseIntensity + Mathf.Sin(ambientClock * 0.31f) * 0.03f; // ~20s cycle
+
+            if (groundRenderer != null)
+            {
+                var mat = groundRenderer.material;
+                var offset = mat.mainTextureOffset;
+                offset.x += Time.deltaTime * 0.004f;
+                mat.mainTextureOffset = offset;
             }
         }
 
@@ -137,7 +165,8 @@ namespace Tycoon
             const float planeBaseSize = 10f; // Unity's default Plane primitive is 10x10 at scale 1
             var ground = CreatePrimitiveChild(mapRoot, PrimitiveType.Plane, new Color(0.4f, 0.66f, 0.35f), Vector3.zero,
                 new Vector3((mapWidth + margin) / planeBaseSize, 1f, (mapDepth + margin) / planeBaseSize));
-            var groundMat = ground.GetComponent<Renderer>().material;
+            groundRenderer = ground.GetComponent<Renderer>();
+            var groundMat = groundRenderer.material;
             groundMat.mainTexture = CreateGroundTexture();
             // Constant tile density (world units per texture repeat) instead of a
             // fixed tile count, so the grass doesn't stretch/squash as the ground
@@ -504,8 +533,10 @@ namespace Tycoon
             else if (nice)
             {
                 // A small flag on the ridge - a touch of pride/investment.
+                // It sways gently (IdleSway) so the map doesn't read as static.
                 CreatePrimitiveChild(root, PrimitiveType.Cube, stake, new Vector3(ridgeLean, ridgeHeight + 0.07f, 0), new Vector3(0.015f, 0.14f, 0.015f));
-                CreatePrimitiveChild(root, PrimitiveType.Cube, new Color(0.75f, 0.25f, 0.2f), new Vector3(ridgeLean + 0.045f, ridgeHeight + 0.11f, 0), new Vector3(0.08f, 0.06f, 0.01f));
+                var flag = CreatePrimitiveChild(root, PrimitiveType.Cube, new Color(0.75f, 0.25f, 0.2f), new Vector3(ridgeLean + 0.045f, ridgeHeight + 0.11f, 0), new Vector3(0.08f, 0.06f, 0.01f));
+                flag.gameObject.AddComponent<IdleSway>();
             }
 
             // Entrance mat: a bit of grounded detail at the open front end.
@@ -572,7 +603,11 @@ namespace Tycoon
         // Floating +$ / market-move indicators
         // ---------------------------------------------------------------
 
-        public void SpawnFloatingIndicator(PropertyState state, string label, Color color)
+        /// <summary>coinPop is only for genuine cash-in-pocket moments (rent
+        /// collected, a sale closed) - not every market wobble on a held
+        /// property, which fires monthly and would make the reward feel cheap
+        /// through repetition.</summary>
+        public void SpawnFloatingIndicator(PropertyState state, string label, Color color, bool coinPop = false)
         {
             var go = new GameObject("FloatingIncome");
             // Parented to the stable Map root, not the building itself: the
@@ -591,6 +626,79 @@ namespace Tycoon
             tm.alignment = TextAlignment.Center;
 
             StartCoroutine(AnimateFloatingIndicator(go.transform, tm));
+
+            if (coinPop) SpawnCoinPop(state);
+        }
+
+        static Texture2D coinTexture;
+        static Material coinMaterial;
+
+        static Material GetCoinMaterial()
+        {
+            if (coinMaterial != null) return coinMaterial;
+            const int size = 32;
+            coinTexture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            coinTexture.filterMode = FilterMode.Bilinear;
+            var center = new Vector2(size / 2f, size / 2f);
+            float radius = size / 2f - 1f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dist = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), center);
+                    float alpha = Mathf.Clamp01(radius - dist + 1f);
+                    coinTexture.SetPixel(x, y, new Color(1f, 0.85f, 0.35f, alpha));
+                }
+            }
+            coinTexture.Apply();
+            coinMaterial = new Material(Shader.Find("Sprites/Default")) { mainTexture = coinTexture };
+            return coinMaterial;
+        }
+
+        /// <summary>A handful of small gold quads arcing up and out under gravity -
+        /// reinforces "cash just landed" alongside the floating +$ text instead of
+        /// leaving text as the only feedback for the moments that matter most.</summary>
+        void SpawnCoinPop(PropertyState state)
+        {
+            var origin = state.view.transform.position + Vector3.up * 1.2f;
+            int count = Random.Range(3, 5);
+            for (int i = 0; i < count; i++)
+            {
+                var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                Destroy(go.GetComponent<Collider>());
+                go.transform.SetParent(state.view.transform.parent, false);
+                go.transform.position = origin;
+                go.transform.rotation = MapCamera.transform.rotation;
+                go.transform.localScale = Vector3.one * 0.09f;
+                go.GetComponent<Renderer>().material = GetCoinMaterial();
+
+                var velocity = new Vector3(Random.Range(-0.35f, 0.35f), Random.Range(0.9f, 1.3f), Random.Range(-0.15f, 0.15f));
+                StartCoroutine(AnimateCoin(go.transform, velocity));
+            }
+        }
+
+        IEnumerator AnimateCoin(Transform t, Vector3 velocity)
+        {
+            if (t == null) yield break;
+            const float duration = 0.55f;
+            const float gravity = 3.2f;
+            float elapsed = 0f;
+            var pos = t.position;
+            while (elapsed < duration)
+            {
+                if (t == null) yield break;
+                float dt = Time.deltaTime; // scaled, like AnimateFloatingIndicator - pauses/speeds up with the game
+                elapsed += dt;
+                velocity.y -= gravity * dt;
+                pos += velocity * dt;
+                t.position = pos;
+                t.Rotate(Vector3.forward, 420f * dt, Space.Self);
+                // Shrink through the last third instead of popping out abruptly.
+                float p = elapsed / duration;
+                if (p > 0.66f) t.localScale = Vector3.one * 0.09f * Mathf.Lerp(1f, 0f, (p - 0.66f) / 0.34f);
+                yield return null;
+            }
+            if (t != null) Destroy(t.gameObject);
         }
 
         IEnumerator AnimateFloatingIndicator(Transform t, TextMesh tm)

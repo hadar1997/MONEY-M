@@ -82,6 +82,7 @@ namespace Tycoon
             Calendar.Tick();
             Plots.UpdatePlotExpiry();
             Popup.RefreshIfOpen();
+            World.TickAmbient();
         }
 
         void HandleWorldClick()
