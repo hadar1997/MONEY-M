@@ -23,7 +23,11 @@ namespace Tycoon
         public Camera MapCamera { get; private set; }
         static Shader worldShader;
 
-        const float SunBaseIntensity = 1.35f;
+        // Kept modest on purpose: weather ambient (see CalendarManager.ApplyWeather)
+        // is already close to full white on its own, so this only needs to add a
+        // gentle directional cue on top - not compete with it - or lit surfaces
+        // clip toward white/pink once bloom and ACES tonemapping process them.
+        const float SunBaseIntensity = 0.55f;
         Light sunLight;
         Renderer groundRenderer;
         float ambientClock;
@@ -117,7 +121,8 @@ namespace Tycoon
             RenderSettings.ambientLight = new Color(0.92f, 0.9f, 0.85f);
 
             var light = FindAnyObjectByType<Light>();
-            if (light == null || light.type != LightType.Directional)
+            bool created = light == null || light.type != LightType.Directional;
+            if (created)
             {
                 // TycoonScene ships with no light of its own - without this, the
                 // warm tint/intensity below (and TickAmbient's breathing) never
@@ -132,7 +137,17 @@ namespace Tycoon
 
             light.shadows = LightShadows.None;
             light.color = new Color(1f, 0.96f, 0.85f); // warm sunlight, not neutral white
-            if (light.intensity < SunBaseIntensity) light.intensity = SunBaseIntensity;
+            // A freshly-created light is set to SunBaseIntensity outright, not
+            // just floored at it - ambient alone is already close to full white
+            // (see the weather ambient colors in ApplyWeather), so stacking a
+            // strong direct light on top of that on a near-horizontal roof
+            // face (the surface this ~50deg-elevation sun hits most directly
+            // of anything on a building) blows it out toward white/pink once
+            // bloom and ACES tonemapping get to it. A pre-existing scene light
+            // some future hand-authored scene provides is only ever raised to
+            // this floor, never dimmed, preserving the original intent there.
+            if (created) light.intensity = SunBaseIntensity;
+            else if (light.intensity < SunBaseIntensity) light.intensity = SunBaseIntensity;
             sunLight = light;
         }
 
@@ -727,8 +742,15 @@ namespace Tycoon
 
             var mat = new Material(GetWorldShader());
             mat.color = color;
-            if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.28f);
-            else if (mat.HasProperty("_Glossiness")) mat.SetFloat("_Glossiness", 0.28f);
+            // Flat/matte on purpose (0, not a mid-range gloss value): with the
+            // sun light now actually present (see SetupLighting), any specular
+            // response here catches a hard highlight on whichever face is most
+            // perpendicular to the light - the roof, on most buildings - and
+            // blows it out toward white/pink once bloom picks it up. A flat
+            // low-poly building reads fine (better, even) without a specular
+            // highlight at all; only the diffuse tier color needs to show.
+            if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0f);
+            else if (mat.HasProperty("_Glossiness")) mat.SetFloat("_Glossiness", 0f);
             materialCache[color] = mat;
             return mat;
         }
