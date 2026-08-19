@@ -12,9 +12,6 @@ namespace Tycoon
         public string displayName;
         public PropertyTier tier;
         public int buyPrice;
-        public int rentPrice;
         public int leaseDurationMonths = 12;
-        public int incomePerTick;
-        public float tickIntervalSeconds = 3f;
     }
 }

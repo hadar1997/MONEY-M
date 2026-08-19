@@ -11,8 +11,8 @@ namespace Tycoon
     {
         public float plotExpirySeconds = 20f;
 
-        public const int Columns = 5;
-        public const int Rows = 4;
+        public const int Columns = 4;
+        public const int Rows = 3;
         public const float CellSpacing = 1.7f;
 
         /// <summary>

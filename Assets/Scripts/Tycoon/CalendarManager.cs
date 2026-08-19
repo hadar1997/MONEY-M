@@ -19,8 +19,8 @@ namespace Tycoon
 
         public enum WeatherType { Sunny, Cloudy, Rainy }
 
-        int monthIndex;
-        int yearNumber = 1;
+        int monthIndex; // 0 = January
+        int yearNumber = 2026;
         float monthTimer;
         WeatherType currentWeather = WeatherType.Sunny;
         ParticleSystem rainParticles;

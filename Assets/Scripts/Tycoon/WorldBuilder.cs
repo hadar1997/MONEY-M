@@ -15,7 +15,7 @@ namespace Tycoon
     public class WorldBuilder : MonoBehaviour
     {
         [Header("Camera")]
-        public float orthographicSize = 5.5f;
+        public float orthographicSize = 4f;
         public float cameraDistance = 13f;
         public Vector3 cameraEuler = new Vector3(32f, 45f, 0f);
 
@@ -84,16 +84,25 @@ namespace Tycoon
             var profile = ScriptableObject.CreateInstance<VolumeProfile>();
 
             var bloom = profile.Add<Bloom>(true);
-            bloom.threshold.Override(0.78f);
-            bloom.intensity.Override(0.4f);
+            bloom.threshold.Override(0.85f); // tighter catch - only real highlights glow, not every lit cube face
+            bloom.intensity.Override(0.32f);
 
             var color = profile.Add<ColorAdjustments>(true);
-            color.saturation.Override(12f);
-            color.contrast.Override(6f);
+            color.saturation.Override(16f);
+            color.contrast.Override(10f);
+            color.postExposure.Override(0.08f);
+
+            var whiteBalance = profile.Add<WhiteBalance>(true);
+            whiteBalance.temperature.Override(6f); // a hair warmer across the board
+
+            // Rolls off highlights instead of clipping to flat white - needed now
+            // that bloom/exposure read hotter than the old flat/no-tonemap setup.
+            var tonemapping = profile.Add<Tonemapping>(true);
+            tonemapping.mode.Override(TonemappingMode.ACES);
 
             var vignette = profile.Add<Vignette>(true);
             vignette.intensity.Override(0.15f);
-            vignette.smoothness.Override(0.7f);
+            vignette.smoothness.Override(0.8f);
 
             // Focus band centered on the map (which sits cameraDistance units
             // in front of the camera); kept wide/gentle so world-space price
@@ -118,13 +127,23 @@ namespace Tycoon
 
         public void BuildGroundAndRoads(Transform mapRoot)
         {
-            var ground = CreatePrimitiveChild(mapRoot, PrimitiveType.Plane, new Color(0.4f, 0.66f, 0.35f), Vector3.zero, new Vector3(1f, 1f, 0.85f));
-            var groundMat = ground.GetComponent<Renderer>().material;
-            groundMat.mainTexture = CreateGroundTexture();
-            groundMat.mainTextureScale = new Vector2(8, 7);
-
             float mapWidth = (PlotManager.Columns - 1) * PlotManager.CellSpacing;
             float mapDepth = (PlotManager.Rows - 1) * PlotManager.CellSpacing;
+
+            // Ground is a grassy border around the plot grid, sized off the grid's
+            // own dimensions (not a fixed constant) so it keeps framing the board
+            // snugly however many rows/columns PlotManager ends up with.
+            const float margin = 2.4f;
+            const float planeBaseSize = 10f; // Unity's default Plane primitive is 10x10 at scale 1
+            var ground = CreatePrimitiveChild(mapRoot, PrimitiveType.Plane, new Color(0.4f, 0.66f, 0.35f), Vector3.zero,
+                new Vector3((mapWidth + margin) / planeBaseSize, 1f, (mapDepth + margin) / planeBaseSize));
+            var groundMat = ground.GetComponent<Renderer>().material;
+            groundMat.mainTexture = CreateGroundTexture();
+            // Constant tile density (world units per texture repeat) instead of a
+            // fixed tile count, so the grass doesn't stretch/squash as the ground
+            // resizes with the grid.
+            const float tilesPerUnit = 0.82f;
+            groundMat.mainTextureScale = new Vector2((mapWidth + margin) * tilesPerUnit, (mapDepth + margin) * tilesPerUnit);
 
             for (int col = 0; col < PlotManager.Columns - 1; col++)
             {
@@ -203,6 +222,8 @@ namespace Tycoon
 
             EnsureClickHitbox(view);
 
+            CreateContactShadow(view.transform);
+
             var plate = CreatePrimitiveChild(view.transform, PrimitiveType.Cube, Color.white, new Vector3(0, 0.01f, 0), new Vector3(0.95f, 0.02f, 0.95f));
             view.statusPlate = plate.GetComponent<Renderer>();
 
@@ -214,22 +235,78 @@ namespace Tycoon
         }
 
         /// <summary>Buildings snapping instantly into existence reads as
-        /// placeholder/debug art; a quick scale-up pop is a cheap, standard
-        /// piece of "game feel" that makes every reroll/tier-up feel intentional.</summary>
+        /// placeholder/debug art; a quick scale-up pop with a slight overshoot
+        /// (squash-and-stretch) is a cheap, standard piece of "game feel" that
+        /// makes every reroll/tier-up feel like an impact instead of just an
+        /// appearance.</summary>
         IEnumerator PlayBuildingPopAnimation(Transform t)
         {
-            const float duration = 0.25f;
+            const float duration = 0.3f;
+            const float overshoot = 1.06f;
+            const float growPhase = 0.7f; // fraction of duration spent growing past 1.0 before settling back
             float elapsed = 0f;
             while (elapsed < duration)
             {
                 if (t == null) yield break;
                 elapsed += Time.unscaledDeltaTime;
                 float p = Mathf.Clamp01(elapsed / duration);
-                float eased = 1f - (1f - p) * (1f - p) * (1f - p); // ease-out cubic
-                t.localScale = Vector3.one * Mathf.Lerp(0.25f, 1f, eased);
+                float scale;
+                if (p < growPhase)
+                {
+                    float e = p / growPhase;
+                    float eased = 1f - (1f - e) * (1f - e) * (1f - e); // ease-out cubic
+                    scale = Mathf.Lerp(0.25f, overshoot, eased);
+                }
+                else
+                {
+                    float e = (p - growPhase) / (1f - growPhase);
+                    scale = Mathf.Lerp(overshoot, 1f, e);
+                }
+                t.localScale = Vector3.one * scale;
                 yield return null;
             }
             if (t != null) t.localScale = Vector3.one;
+        }
+
+        static Texture2D contactShadowTexture;
+        static Material contactShadowMaterial;
+
+        static Material GetContactShadowMaterial()
+        {
+            if (contactShadowMaterial != null) return contactShadowMaterial;
+            const int size = 64;
+            contactShadowTexture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            contactShadowTexture.filterMode = FilterMode.Bilinear;
+            var center = new Vector2(size / 2f, size / 2f);
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dist = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), center) / (size / 2f);
+                    float falloff = Mathf.Clamp01(1f - dist);
+                    falloff *= falloff; // soft edge - center reads darkest, rim nearly invisible
+                    contactShadowTexture.SetPixel(x, y, new Color(0f, 0f, 0f, falloff * 0.35f));
+                }
+            }
+            contactShadowTexture.Apply();
+            contactShadowMaterial = new Material(Shader.Find("Sprites/Default")) { mainTexture = contactShadowTexture };
+            return contactShadowMaterial;
+        }
+
+        /// <summary>Soft dark blob under each building, larger than its footprint
+        /// so it peeks out past the status plate. Dynamic shadows are off at this
+        /// scale (SetupLighting), which otherwise leaves every building looking
+        /// like it's floating a millimeter above the ground - this is the cheap
+        /// substitute grounding it instead.</summary>
+        void CreateContactShadow(Transform root)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            Destroy(go.GetComponent<Collider>());
+            go.transform.SetParent(root, false);
+            go.transform.localPosition = new Vector3(0, 0.004f, 0); // above the ground, below the status plate
+            go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); // lie flat
+            go.transform.localScale = new Vector3(1.3f, 1.3f, 1f);
+            go.GetComponent<Renderer>().material = GetContactShadowMaterial();
         }
 
         /// <summary>One consistent hitbox per plot, sized the same at every

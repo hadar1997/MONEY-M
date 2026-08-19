@@ -21,9 +21,10 @@ namespace Tycoon
         }
 
         /// <summary>Cash on hand plus the current market value of everything you
-        /// Own (not Rented - that's a lease, not an asset). This is what actually
-        /// grows while you hold a property, even though the spendable balance
-        /// itself doesn't move until you sell.</summary>
+        /// own - whether you're holding it bare or it's currently leased out,
+        /// buying it is what made it yours, so both count as an asset. This is
+        /// what actually grows while you hold a property, even though the
+        /// spendable balance itself doesn't move until you sell.</summary>
         public int ComputeNetWorth()
         {
             int total = balance;
@@ -31,7 +32,7 @@ namespace Tycoon
             if (plots != null)
             {
                 foreach (var state in plots)
-                    if (state.ownership == PropertyOwnership.Owned)
+                    if (state.ownership != PropertyOwnership.Unowned)
                         total += Mathf.RoundToInt(state.marketValue);
             }
             return total;

@@ -5,9 +5,13 @@ using UnityEngine.UI;
 namespace Tycoon
 {
     /// <summary>
-    /// The Buy/Rent/Sell/Abandon decision popup and the actions it triggers.
-    /// Reads/writes EconomyManager balance and PlotManager plot state; owns no
-    /// state of its own beyond the popup's UI widgets and which plot is open.
+    /// The Buy/Sell/Lease decision popup and the actions it triggers. Ownership
+    /// only ever begins with a Buy at market price; leasing a property out to a
+    /// tenant (and, 12 months later, renewing that lease or selling) is something
+    /// you do *with* a property you already own, never a separate cheaper way to
+    /// acquire one. Reads/writes EconomyManager balance and PlotManager plot
+    /// state; owns no state of its own beyond the popup's UI widgets and which
+    /// plot is open.
     /// </summary>
     public class PropertyPopupController : MonoBehaviour
     {
@@ -71,14 +75,13 @@ namespace Tycoon
             if (justOpened) StartCoroutine(PlayOpenAnimation());
 
             // Every branch below assumes both action buttons start visible;
-            // only the Rented/Owned branches need to hide one.
+            // only the Rented branch needs to hide both.
             buyButton.gameObject.SetActive(true);
             secondaryButton.gameObject.SetActive(true);
 
             if (state.ownership == PropertyOwnership.Rented)
             {
-                int monthlyIncome = def.incomePerTick - state.lockedRent;
-                popupTitle.text = $"{def.displayName} - leased, {state.leaseMonthsRemaining} mo left ({EconomyManager.FormatSigned(monthlyIncome)}/mo net). Nothing to do until the lease ends.";
+                popupTitle.text = $"{def.displayName} - leased, {state.leaseMonthsRemaining} mo left ({EconomyManager.FormatSigned(state.lockedRent)}/mo). Nothing to do until the lease ends.";
 
                 buyButton.gameObject.SetActive(false);
                 secondaryButton.gameObject.SetActive(false);
@@ -89,53 +92,57 @@ namespace Tycoon
                 return;
             }
 
-            if (state.ownership == PropertyOwnership.Owned)
+            if (state.ownership == PropertyOwnership.Owned || state.ownership == PropertyOwnership.NeedsDecision)
             {
+                // You already own this one (that's how you got here - Buy is the
+                // only way in). From here you can sell it, lease it out to a
+                // tenant for 12 months, or just close the popup and keep holding
+                // it bare while you wait for a better market.
+                bool needsDecision = state.ownership == PropertyOwnership.NeedsDecision;
                 int sellPrice = Mathf.RoundToInt(state.marketValue);
                 int diff = sellPrice - state.purchasePrice;
                 string diffText = diff >= 0 ? $"profit {EconomyManager.FormatSigned(diff)}" : $"loss {EconomyManager.FormatMoney(diff)}";
-                popupTitle.text = $"{def.displayName} - worth {EconomyManager.FormatMoney(sellPrice)} ({diffText})";
+                int monthlyRent = Mathf.RoundToInt(state.marketValue * game.Market.rentRateFraction);
 
-                secondaryButton.gameObject.SetActive(false);
+                popupTitle.text = needsDecision
+                    ? $"{def.displayName} - lease ended, worth {EconomyManager.FormatMoney(sellPrice)} ({diffText})"
+                    : $"{def.displayName} - worth {EconomyManager.FormatMoney(sellPrice)} ({diffText})";
 
                 buyButtonLabel.text = $"Sell for {EconomyManager.FormatMoney(sellPrice)}";
                 buyButton.interactable = true;
                 buyButton.onClick.RemoveAllListeners();
                 buyButton.onClick.AddListener(() => ConfirmSell(index));
 
-                cancelButtonLabel.text = "Cancel";
+                secondaryButtonLabel.text = needsDecision
+                    ? $"Renew lease - {EconomyManager.FormatMoney(monthlyRent)}/mo"
+                    : $"Lease out - {EconomyManager.FormatMoney(monthlyRent)}/mo";
+                secondaryButton.interactable = true;
+                secondaryButton.onClick.RemoveAllListeners();
+                secondaryButton.onClick.AddListener(() => SignLease(index));
+
+                cancelButtonLabel.text = needsDecision ? "Keep holding" : "Cancel";
                 cancelButton.onClick.RemoveAllListeners();
-                cancelButton.onClick.AddListener(Close);
+                if (needsDecision)
+                    cancelButton.onClick.AddListener(() => KeepHolding(index));
+                else
+                    cancelButton.onClick.AddListener(Close);
                 return;
             }
 
-            bool needsDecision = state.ownership == PropertyOwnership.NeedsDecision;
+            // Unowned: the only way in is to buy it outright at market price.
             int buyPrice = Mathf.RoundToInt(state.marketValue);
-            int monthlyRent = Mathf.RoundToInt(state.marketValue * game.Market.rentRateFraction);
-            int balance = game.Economy.balance;
-
-            popupTitle.text = needsDecision
-                ? $"{def.displayName} - lease expired, what now?"
-                : def.displayName;
+            popupTitle.text = def.displayName;
 
             buyButtonLabel.text = $"Buy for {EconomyManager.FormatMoney(buyPrice)}";
-            buyButton.interactable = balance >= buyPrice;
+            buyButton.interactable = game.Economy.balance >= buyPrice;
             buyButton.onClick.RemoveAllListeners();
             buyButton.onClick.AddListener(() => ConfirmBuy(index));
 
-            secondaryButtonLabel.text = needsDecision
-                ? $"Renew lease - {EconomyManager.FormatMoney(monthlyRent)}/mo"
-                : $"Rent - {EconomyManager.FormatMoney(monthlyRent)}/mo";
-            secondaryButton.interactable = balance >= monthlyRent;
-            secondaryButton.onClick.RemoveAllListeners();
-            secondaryButton.onClick.AddListener(() => SignLease(index));
+            secondaryButton.gameObject.SetActive(false);
 
-            cancelButtonLabel.text = needsDecision ? "Abandon property" : "Cancel";
+            cancelButtonLabel.text = "Cancel";
             cancelButton.onClick.RemoveAllListeners();
-            if (needsDecision)
-                cancelButton.onClick.AddListener(() => ConfirmAbandon(index));
-            else
-                cancelButton.onClick.AddListener(Close);
+            cancelButton.onClick.AddListener(Close);
         }
 
         public void Close()
@@ -180,24 +187,26 @@ namespace Tycoon
             Close();
         }
 
-        /// <summary>Signs (or renews) a 12-month lease at the plot's current market
-        /// value. Shared by the manual Rent/Renew button and MarketManager's
-        /// auto-manager renewal so both paths stay in exact sync - only one place
-        /// decides what a lease costs and how long it lasts.</summary>
+        /// <summary>Leases an already-owned plot out to a tenant for a 12-month
+        /// term at the current market rate (or renews an ended lease the same
+        /// way). No cost to the owner - you already paid for the property when
+        /// you bought it; from here on the rent is pure income, paid out monthly
+        /// by MarketManager.PayMonthlyRent. Shared by the manual Lease/Renew
+        /// button and MarketManager's auto-manager renewal so both paths stay in
+        /// exact sync - only one place decides what a lease pays and how long it
+        /// lasts.</summary>
         public void SignLease(int index)
         {
             var state = game.Plots.plots[index];
             var def = state.definition;
             int monthlyRent = Mathf.RoundToInt(state.marketValue * game.Market.rentRateFraction);
-            if (game.Economy.balance < monthlyRent) return;
 
-            game.Economy.balance -= monthlyRent; // first month charged immediately
             state.ownership = PropertyOwnership.Rented;
-            // Locked in for the whole lease term - PayMonthlyRent charges this fixed
-            // amount every month regardless of marketValue drift, so market swings
-            // during the lease don't change what the tenant pays. Only renewing (or
-            // signing a fresh lease after expiry) recomputes it from the then-current
-            // marketValue.
+            // Locked in for the whole lease term - PayMonthlyRent pays out this
+            // fixed amount every month regardless of marketValue drift, so market
+            // swings during the lease don't change what the tenant owes. Only
+            // renewing (or signing a fresh lease after expiry) recomputes it from
+            // the then-current marketValue.
             state.lockedRent = monthlyRent;
             state.leaseMonthsRemaining = def.leaseDurationMonths;
 
@@ -207,10 +216,13 @@ namespace Tycoon
             if (IsOpen && activeIndex == index) Close();
         }
 
-        void ConfirmAbandon(int index)
+        /// <summary>Ends the post-lease decision without renewing or selling -
+        /// property reverts to plain ownership, still yours, just without a
+        /// tenant until you choose to lease it out again.</summary>
+        void KeepHolding(int index)
         {
             var state = game.Plots.plots[index];
-            state.ownership = PropertyOwnership.Unowned;
+            state.ownership = PropertyOwnership.Owned;
             state.view.Refresh();
             game.Plots.RefreshPriceLabel(state);
             Close();

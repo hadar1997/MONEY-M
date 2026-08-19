@@ -80,6 +80,7 @@ namespace Tycoon
             var img = CreateImage(parent, name, color, anchoredPos, sizeDelta);
             var btn = img.gameObject.AddComponent<Button>();
             btn.targetGraphic = img;
+            img.gameObject.AddComponent<ButtonPressFeedback>();
             label = CreateText(img.transform, "Label", "", 26, Color.white, Vector2.zero, sizeDelta - new Vector2(20, 20), font);
             return btn;
         }

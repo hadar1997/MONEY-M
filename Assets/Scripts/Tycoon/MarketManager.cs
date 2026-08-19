@@ -37,16 +37,16 @@ namespace Tycoon
             game = owner;
         }
 
-        /// <summary>Rented properties net (income - monthly rent cost) once per
-        /// in-game month instead of on a fast tick schedule. Rent cost is the
+        /// <summary>Leased properties collect rent from their tenant once per
+        /// in-game month instead of on a fast tick schedule. The rent is the
         /// amount locked in when the lease was signed (PropertyState.lockedRent),
         /// not the live market value - a signed lease shouldn't get more expensive
-        /// mid-term just because the market moved. Also counts down each lease's
-        /// remaining months and ends it (or auto-renews it, once the Property
-        /// Manager upgrade is unlocked) when it reaches zero - driven off this
-        /// same monthly settlement rather than a second, separately-clocked timer,
-        /// so the "months remaining" shown in the portfolio can never drift from
-        /// the rent actually being charged.</summary>
+        /// or cheaper mid-term just because the market moved. Also counts down
+        /// each lease's remaining months and ends it (or auto-renews it, once the
+        /// Property Manager upgrade is unlocked) when it reaches zero - driven off
+        /// this same monthly settlement rather than a second, separately-clocked
+        /// timer, so the "months remaining" shown in the portfolio can never drift
+        /// from the rent actually being collected.</summary>
         public void PayMonthlyRent()
         {
             var plots = game.Plots.plots;
@@ -55,12 +55,11 @@ namespace Tycoon
             {
                 if (state.ownership != PropertyOwnership.Rented) continue;
 
-                int net = state.definition.incomePerTick - state.lockedRent;
+                int net = state.lockedRent;
                 game.Economy.balance += net;
                 game.Economy.sessionProfit += net;
 
-                var color = net >= 0 ? GainColor : LossColor;
-                game.World.SpawnFloatingIndicator(state, EconomyManager.FormatSigned(net), color);
+                game.World.SpawnFloatingIndicator(state, EconomyManager.FormatSigned(net), GainColor);
 
                 state.leaseMonthsRemaining--;
                 if (state.leaseMonthsRemaining <= 0)
@@ -88,7 +87,7 @@ namespace Tycoon
             {
                 if (state.ownership == PropertyOwnership.NeedsDecision) continue;
 
-                float changePercent = Random.Range(-0.1f, 0.1f) + TrendBiasPercent(CurrentTrend);
+                float changePercent = Random.Range(-0.12f, 0.12f) + TrendBiasPercent(CurrentTrend);
                 float delta = state.marketValue * changePercent;
                 state.marketValue = Mathf.Max(1f, state.marketValue + delta);
                 state.lastDeltaPositive = delta >= 0;
@@ -118,10 +117,10 @@ namespace Tycoon
 
         static float TrendBiasPercent(MarketTrend trend) => trend switch
         {
-            MarketTrend.Bull => 0.06f,
-            MarketTrend.Bear => -0.06f,
-            MarketTrend.Boom => 0.2f,
-            MarketTrend.Crash => -0.25f,
+            MarketTrend.Bull => 0.08f,
+            MarketTrend.Bear => -0.08f,
+            MarketTrend.Boom => 0.23f,
+            MarketTrend.Crash => -0.27f,
             _ => 0f,
         };
 
@@ -143,7 +142,7 @@ namespace Tycoon
             _ => Color.white,
         };
 
-        /// <summary>Sum of (income - locked rent) across every currently-leased plot -
+        /// <summary>Sum of locked-in rent across every currently-leased plot -
         /// the dashboard's "Monthly Passive Income" figure.</summary>
         public int ComputeMonthlyPassiveIncome()
         {
@@ -152,7 +151,7 @@ namespace Tycoon
             int total = 0;
             foreach (var state in plots)
                 if (state.ownership == PropertyOwnership.Rented)
-                    total += state.definition.incomePerTick - state.lockedRent;
+                    total += state.lockedRent;
             return total;
         }
 
