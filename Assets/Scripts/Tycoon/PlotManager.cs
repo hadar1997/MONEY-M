@@ -103,9 +103,18 @@ namespace Tycoon
         public void UpdatePlotExpiry()
         {
             if (plots == null) return;
+            // Whichever plot the Buy/Cancel popup is currently open on is
+            // frozen, same principle as MarketManager/WorldEventManager
+            // already freeze a NeedsDecision plot mid post-lease-decision -
+            // without this, a plot the player is actively deciding whether to
+            // buy could silently reroll to a different (often much cheaper)
+            // listing while the popup just sits there, and clicking "Buy"
+            // afterward buys whatever it rerolled into, not what they saw.
+            int openIndex = game.Popup.ActiveIndex;
             foreach (var state in plots)
             {
                 if (state.ownership != PropertyOwnership.Unowned) continue;
+                if (state.index == openIndex) continue;
                 if (Time.time >= state.expiresAt) RerollPlot(state);
             }
         }

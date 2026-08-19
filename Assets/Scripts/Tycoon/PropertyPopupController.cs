@@ -54,6 +54,9 @@ namespace Tycoon
 
         public bool IsOpen => popupPanel.activeSelf;
 
+        /// <summary>For PlotManager.UpdatePlotExpiry only - -1 while closed.</summary>
+        public int ActiveIndex => IsOpen ? activeIndex : -1;
+
         /// <summary>Re-renders the open popup against current data every frame
         /// (see GameManager.Update). The market keeps ticking while a decision
         /// is pending, so without this the price you *see* and the price
