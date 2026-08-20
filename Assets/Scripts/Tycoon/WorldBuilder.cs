@@ -197,8 +197,18 @@ namespace Tycoon
 
             var profile = ScriptableObject.CreateInstance<VolumeProfile>();
 
+            // Price tags are World Space canvases - they're part of the 3D
+            // scene's own camera output, not a separate UI overlay, so they
+            // go through this same HDR/bloom pass just like a lit cube face
+            // does. White text at threshold 0.85, boosted by postExposure
+            // below, was crossing it - giving every price tag's text a soft
+            // glow/halo that read as "not sharp" no matter how crisp the
+            // underlying TMP SDF rendering itself was. Raised past 1.0 (true
+            // white output no longer blooms) so only genuinely overbright
+            // content - direct sunlight hitting a surface, stacked with
+            // ambient - still glows; text and flat UI colors don't.
             var bloom = profile.Add<Bloom>(true);
-            bloom.threshold.Override(0.85f); // tighter catch - only real highlights glow, not every lit cube face
+            bloom.threshold.Override(1.05f);
             bloom.intensity.Override(0.32f);
 
             var color = profile.Add<ColorAdjustments>(true);
