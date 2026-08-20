@@ -124,20 +124,30 @@ namespace Tycoon
         {
             var nextUnlockPill = UIFactory.CreateBubblePanel(root, "NextUnlockPill", new Color(0.1f, 0.11f, 0.15f, 0.94f), new Vector2(0, -560f), new Vector2(760, 72));
             UIFactory.CreateIconBadge(root, new Color(0.55f, 0.85f, 0.4f), new Vector2(-330, -560f), 50);
-            nextUnlockText = UIFactory.CreateText(nextUnlockPill.transform, "NextUnlock", "", 19, new Color(0.78f, 0.96f, 0.68f), new Vector2(28, 0), new Vector2(660, 60));
+            nextUnlockText = UIFactory.CreateText(nextUnlockPill.transform, "NextUnlock", "", 21, new Color(0.78f, 0.96f, 0.68f), new Vector2(28, 0), new Vector2(660, 60));
 
             marketTrendPill = UIFactory.CreateBubblePanel(root, "MarketTrendPill", new Color(0.18f, 0.18f, 0.22f, 0.94f), new Vector2(0, -640f), new Vector2(760, 58));
-            marketTrendText = UIFactory.CreateText(marketTrendPill.transform, "MarketTrendText", "", 18, Color.white, Vector2.zero, new Vector2(700, 52));
+            marketTrendText = UIFactory.CreateText(marketTrendPill.transform, "MarketTrendText", "", 20, Color.white, Vector2.zero, new Vector2(700, 52));
 
+            // Icon badges + bare numbers, not "Profit +$1.2K"/"Worth $5.2K"
+            // labels - same principle the Balance pill above already uses
+            // (see its own comment): color + a small icon already say what
+            // each chip is, so dropping the word lets the actual number -
+            // the only part anyone's actually reading - render meaningfully
+            // bigger within the same tight 250-wide chip instead of being
+            // permanently squeezed down to fit a label next to it.
             const float chipY = -716f, chipW = 250f;
             var profitPill = UIFactory.CreateBubblePanel(root, "ProfitPill", new Color(0.2f, 0.7f, 0.3f), new Vector2(-260, chipY), new Vector2(chipW, 58));
-            profitText = UIFactory.CreateText(profitPill.transform, "ProfitText", "", 16, Color.white, Vector2.zero, new Vector2(220, 52));
+            UIFactory.CreateIconBadge(root, new Color(1f, 1f, 1f, 0.9f), new Vector2(-260 - 92, chipY), 30);
+            profitText = UIFactory.CreateText(profitPill.transform, "ProfitText", "", 22, Color.white, new Vector2(14, 0), new Vector2(190, 52));
 
             var netWorthPill = UIFactory.CreateBubblePanel(root, "NetWorthPill", new Color(0.55f, 0.42f, 0.12f), new Vector2(0, chipY), new Vector2(chipW, 58));
-            netWorthText = UIFactory.CreateText(netWorthPill.transform, "NetWorthText", "", 16, Color.white, Vector2.zero, new Vector2(220, 52));
+            UIFactory.CreateIconBadge(root, new Color(1f, 1f, 1f, 0.9f), new Vector2(0 - 92, chipY), 30);
+            netWorthText = UIFactory.CreateText(netWorthPill.transform, "NetWorthText", "", 22, Color.white, new Vector2(14, 0), new Vector2(190, 52));
 
             var monthlyIncomePill = UIFactory.CreateBubblePanel(root, "MonthlyIncomePill", new Color(0.16f, 0.4f, 0.38f), new Vector2(260, chipY), new Vector2(chipW, 58));
-            monthlyIncomeText = UIFactory.CreateText(monthlyIncomePill.transform, "MonthlyIncomeText", "", 16, Color.white, Vector2.zero, new Vector2(220, 52));
+            UIFactory.CreateIconBadge(root, new Color(1f, 1f, 1f, 0.9f), new Vector2(260 - 92, chipY), 30);
+            monthlyIncomeText = UIFactory.CreateText(monthlyIncomePill.transform, "MonthlyIncomeText", "", 22, Color.white, new Vector2(14, 0), new Vector2(190, 52));
         }
 
         // Bottom control row sits near the actual bottom of the (now much
@@ -369,8 +379,11 @@ namespace Tycoon
                 ? $"Next: {nextName} · {EconomyManager.FormatMoney(remaining)} to go"
                 : "Every tier unlocked!";
 
-            profitText.text = $"Profit {EconomyManager.FormatSigned(game.Economy.sessionProfit)}";
-            netWorthText.text = $"Worth {EconomyManager.FormatMoney(game.Economy.ComputeNetWorth())}";
+            // No "Profit "/"Worth " labels - each chip's own color (and the
+            // icon badge on it) already says what it is, same principle as
+            // the Balance pill above.
+            profitText.text = EconomyManager.FormatSigned(game.Economy.sessionProfit);
+            netWorthText.text = EconomyManager.FormatMoney(game.Economy.ComputeNetWorth());
             monthlyIncomeText.text = $"{EconomyManager.FormatSigned(game.Market.ComputeMonthlyPassiveIncome())}/mo";
 
             // An active world event is the dominant story of what's happening to

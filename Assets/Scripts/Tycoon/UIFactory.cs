@@ -91,6 +91,19 @@ namespace Tycoon
             txt.fontSize = fontSize;
             txt.color = color;
             txt.alignment = TextAlignmentOptions.Center;
+            // Auto-size within a range around the requested fontSize instead
+            // of a single fixed size: this game's numbers vary wildly in
+            // length ("$25" vs "$2.3M", "+$1.2K" vs "-$450"), and a size
+            // hand-picked to survive the longest case reads as permanently
+            // small/cramped for the (much more common) short case - which is
+            // exactly what made the bottom HUD chips illegible. This way
+            // short content renders at up to 1.35x larger, long content
+            // shrinks only as far as it actually needs to (down to 0.6x) to
+            // still fit its box, rather than every value settling for a
+            // worst-case compromise size.
+            txt.enableAutoSizing = true;
+            txt.fontSizeMin = fontSize * 0.6f;
+            txt.fontSizeMax = fontSize * 1.35f;
             var rt = txt.rectTransform;
             rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
             rt.anchoredPosition = anchoredPos;
