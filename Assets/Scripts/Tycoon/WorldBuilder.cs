@@ -545,7 +545,7 @@ namespace Tycoon
             var canvas = tagGO.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
             var canvasRT = canvas.GetComponent<RectTransform>();
-            canvasRT.sizeDelta = new Vector2(190, 52);
+            canvasRT.sizeDelta = new Vector2(160, 48);
 
             // No FloatingBubble bob here (unlike the popup/settings/event
             // cards) - each tag would bob on its own independent random
@@ -553,10 +553,16 @@ namespace Tycoon
             // ambiguous which price belonged to which building instead of a
             // deliberate "floating" look. Staying pinned directly above its
             // building is what actually makes the link readable.
-            var pill = UIFactory.CreateBubblePanel(tagGO.transform, "Pill", Color.white, Vector2.zero, new Vector2(180, 46));
+            //
+            // Pill width kept under PlotManager.CellSpacing (1.7 world units
+            // = 170 in this "UI pixel" space, before the 0.01 scale above) -
+            // at the old 180 wide, every tag was wider than the gap between
+            // plot centers, so neighboring tags always overlapped into a
+            // wall of stacked pills.
+            var pill = UIFactory.CreateBubblePanel(tagGO.transform, "Pill", Color.white, Vector2.zero, new Vector2(150, 44));
             view.priceTagPill = pill;
 
-            var text = UIFactory.CreateText(tagGO.transform, "Text", "", 22, Color.white, new Vector2(16, 0), new Vector2(130, 42));
+            var text = UIFactory.CreateText(tagGO.transform, "Text", "", 20, Color.white, new Vector2(13, 0), new Vector2(104, 38));
             text.fontStyle = FontStyles.Bold;
             view.priceTagText = text;
 
@@ -566,11 +572,11 @@ namespace Tycoon
             badge.sprite = UIFactory.GetCircleSprite();
             var badgeRT = badge.rectTransform;
             badgeRT.anchorMin = badgeRT.anchorMax = badgeRT.pivot = new Vector2(0.5f, 0.5f);
-            badgeRT.anchoredPosition = new Vector2(-88, 0); // overlaps the pill's left edge
-            badgeRT.sizeDelta = new Vector2(42, 42);
+            badgeRT.anchoredPosition = new Vector2(-58, 0); // overlaps the pill's left edge
+            badgeRT.sizeDelta = new Vector2(36, 36);
             view.priceTagBadge = badge;
 
-            var arrow = UIFactory.CreateText(badgeGO.transform, "Arrow", "", 22, Color.white, Vector2.zero, new Vector2(42, 42));
+            var arrow = UIFactory.CreateText(badgeGO.transform, "Arrow", "", 19, Color.white, Vector2.zero, new Vector2(36, 36));
             arrow.fontStyle = FontStyles.Bold;
             view.priceTagArrow = arrow;
         }
@@ -732,8 +738,21 @@ namespace Tycoon
 
         static Shader GetWorldShader()
         {
+            // "Standard" deliberately dropped from this chain - it's a
+            // Built-in Render Pipeline shader, and this project runs URP.
+            // Shader.Find("Standard") still SUCCEEDS (the shader genuinely
+            // exists), so it used to look like a safe fallback, but URP can't
+            // properly shade a Built-in RP shader either - it renders with
+            // the same magenta "shader error" look as an actually-missing
+            // shader, just via a different path. Sprites/Default is a real,
+            // pipeline-agnostic fallback (unlit, but at least the right
+            // color) if the URP/Lit shader is ever unavailable for some
+            // reason (see GraphicsSettings' Always Included Shaders, which
+            // is the actual fix - every material here is built purely via
+            // Shader.Find at runtime with no material asset referencing it,
+            // so without that list entry a build could strip it entirely).
             if (worldShader == null)
-                worldShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard") ?? Shader.Find("Sprites/Default");
+                worldShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Sprites/Default");
             return worldShader;
         }
 
