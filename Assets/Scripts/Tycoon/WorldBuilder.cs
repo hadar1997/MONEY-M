@@ -184,6 +184,16 @@ namespace Tycoon
             var camData = MapCamera.GetComponent<UniversalAdditionalCameraData>();
             if (camData == null) camData = MapCamera.gameObject.AddComponent<UniversalAdditionalCameraData>();
             camData.renderPostProcessing = true;
+            // MSAA (see URP_PipelineAsset) only smooths triangle edges - it
+            // doesn't touch shader/texture-level aliasing (thin trim posts,
+            // window cutouts, road dashes, small UI-in-world elements), which
+            // is a separate post-process pass that was never actually
+            // configured. SMAA over FXAA/TAA: no temporal ghosting on the
+            // constant stream of small animating elements here (coin pops,
+            // floating +$ text, price-tag pulses), unlike TAA which needs
+            // multiple frames to converge and can smear fast-moving content.
+            camData.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
+            camData.antialiasingQuality = AntialiasingQuality.High;
 
             var profile = ScriptableObject.CreateInstance<VolumeProfile>();
 
@@ -340,10 +350,20 @@ namespace Tycoon
 
         static Texture2D CreateGroundTexture()
         {
-            const int size = 64;
-            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            // 256px (up from 64) with mipmaps + anisotropic filtering: this is
+            // random per-pixel noise, tiled ~6-8x across the ground and viewed
+            // at a steep oblique angle by the tilted camera - exactly the
+            // worst case for texture aliasing (no spatial correlation for the
+            // GPU to average away when minifying). Without mips, that read as
+            // a constant shimmering/noisy "pixelated" grain across the single
+            // largest, always-visible surface in the whole scene, independent
+            // of every UI/edge-AA fix - mipmaps + aniso is the actual fix for
+            // that class of artifact; MSAA/SMAA only smooth geometric edges.
+            const int size = 256;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true);
             tex.wrapMode = TextureWrapMode.Repeat;
-            tex.filterMode = FilterMode.Bilinear;
+            tex.filterMode = FilterMode.Trilinear;
+            tex.anisoLevel = 9;
 
             var baseColor = new Color(0.42f, 0.66f, 0.35f);
             var rand = new System.Random(1);
@@ -358,7 +378,7 @@ namespace Tycoon
                         Mathf.Clamp01(baseColor.b + n)));
                 }
             }
-            tex.Apply();
+            tex.Apply(); // updateMipmaps defaults true - regenerates the full chain from this 256px source
             return tex;
         }
 
