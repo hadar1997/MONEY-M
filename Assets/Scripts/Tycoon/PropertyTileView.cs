@@ -1,4 +1,5 @@
 using System.Collections;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -22,8 +23,8 @@ namespace Tycoon
         /// needs economy knowledge (rent rate, market value) this view doesn't have.</summary>
         public Image priceTagPill;
         public Image priceTagBadge;
-        public Text priceTagArrow;
-        public Text priceTagText;
+        public TextMeshProUGUI priceTagArrow;
+        public TextMeshProUGUI priceTagText;
 
         PropertyState state;
         Coroutine pulseRoutine;

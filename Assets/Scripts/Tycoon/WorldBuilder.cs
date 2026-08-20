@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -496,11 +497,14 @@ namespace Tycoon
             return height + 0.14f; // roof cap spans [height, height+0.14] - see BuildBuildingMesh
         }
 
-        /// <summary>Small World Space Canvas pill (rounded background + circular
-        /// trend badge + compact text) above the building - reuses the same
-        /// rounded-rect/circle sprites as the HUD so it matches the reference
-        /// game's style instead of being a plain 3D quad. Height scales with the
-        /// building's own roofline so it stays visually attached at every tier.</summary>
+        /// <summary>Small World Space Canvas pill (soft floating bubble +
+        /// circular trend badge + compact TMP text) above the building - reuses
+        /// the same rounded-rect/circle sprites as the HUD so it matches the
+        /// rest of the UI instead of being a plain 3D quad. Height scales with
+        /// the building's own roofline so it stays visually attached at every
+        /// tier. A gentle world-space bob (small amplitude - this is in world
+        /// units, not screen pixels) makes each sign read as literally
+        /// floating above its building rather than rigidly bolted on.</summary>
         void CreatePriceTag(PropertyTileView view, PropertyDefinition def)
         {
             var tagGO = new GameObject("PriceTag");
@@ -515,28 +519,19 @@ namespace Tycoon
             var canvasRT = canvas.GetComponent<RectTransform>();
             canvasRT.sizeDelta = new Vector2(190, 52);
 
-            var pillGO = new GameObject("Pill", typeof(RectTransform));
-            pillGO.transform.SetParent(tagGO.transform, false);
-            var pill = pillGO.AddComponent<Image>();
-            pill.sprite = UIFactory.GetRoundedRectSprite();
-            pill.type = Image.Type.Sliced;
-            var pillRT = pill.rectTransform;
-            pillRT.anchorMin = pillRT.anchorMax = pillRT.pivot = new Vector2(0.5f, 0.5f);
-            pillRT.sizeDelta = new Vector2(180, 46);
+            // FloatingBubble casts transform to RectTransform, so it can only
+            // go on AFTER Canvas above - Canvas is what actually converts this
+            // GameObject's plain Transform into a RectTransform in the first
+            // place; adding it before that cast would throw.
+            var bob = tagGO.AddComponent<FloatingBubble>();
+            bob.bobAmplitude = 3f; // in the same "UI pixel" space as sizeDelta below - ~0.03 world units once the 0.01 scale above applies
+            bob.bobSpeed = 1.3f;
+
+            var pill = UIFactory.CreateBubblePanel(tagGO.transform, "Pill", Color.white, Vector2.zero, new Vector2(180, 46));
             view.priceTagPill = pill;
 
-            var textGO = new GameObject("Text", typeof(RectTransform));
-            textGO.transform.SetParent(tagGO.transform, false);
-            var text = textGO.AddComponent<Text>();
-            text.font = game.Font;
-            text.fontSize = 22;
-            text.fontStyle = FontStyle.Bold;
-            text.alignment = TextAnchor.MiddleCenter;
-            text.color = Color.white;
-            var textRT = text.rectTransform;
-            textRT.anchorMin = textRT.anchorMax = textRT.pivot = new Vector2(0.5f, 0.5f);
-            textRT.anchoredPosition = new Vector2(16, 0);
-            textRT.sizeDelta = new Vector2(130, 42);
+            var text = UIFactory.CreateText(tagGO.transform, "Text", "", 22, Color.white, new Vector2(16, 0), new Vector2(130, 42));
+            text.fontStyle = FontStyles.Bold;
             view.priceTagText = text;
 
             var badgeGO = new GameObject("Badge", typeof(RectTransform));
@@ -549,19 +544,8 @@ namespace Tycoon
             badgeRT.sizeDelta = new Vector2(42, 42);
             view.priceTagBadge = badge;
 
-            var arrowGO = new GameObject("Arrow", typeof(RectTransform));
-            arrowGO.transform.SetParent(badgeGO.transform, false);
-            var arrow = arrowGO.AddComponent<Text>();
-            arrow.font = game.Font;
-            arrow.fontSize = 22;
-            arrow.fontStyle = FontStyle.Bold;
-            arrow.alignment = TextAnchor.MiddleCenter;
-            arrow.color = Color.white;
-            var arrowRT = arrow.rectTransform;
-            arrowRT.anchorMin = Vector2.zero;
-            arrowRT.anchorMax = Vector2.one;
-            arrowRT.sizeDelta = Vector2.zero;
-            arrowRT.anchoredPosition = Vector2.zero;
+            var arrow = UIFactory.CreateText(badgeGO.transform, "Arrow", "", 22, Color.white, Vector2.zero, new Vector2(42, 42));
+            arrow.fontStyle = FontStyles.Bold;
             view.priceTagArrow = arrow;
         }
 

@@ -15,8 +15,6 @@ namespace Tycoon
     /// </summary>
     public class GameManager : MonoBehaviour
     {
-        public Font Font { get; private set; }
-
         public WorldBuilder World { get; private set; }
         public EconomyManager Economy { get; private set; }
         public MarketManager Market { get; private set; }
@@ -42,7 +40,6 @@ namespace Tycoon
         void Awake()
         {
             QualitySettings.antiAliasing = 4;
-            Font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             World = gameObject.AddComponent<WorldBuilder>();
             Economy = gameObject.AddComponent<EconomyManager>();

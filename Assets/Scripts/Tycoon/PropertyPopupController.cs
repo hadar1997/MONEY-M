@@ -1,4 +1,4 @@
-using System.Collections;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -18,16 +18,15 @@ namespace Tycoon
         GameManager game;
 
         public GameObject popupPanel;
-        Text popupTitle;
+        TextMeshProUGUI popupTitle;
         Button buyButton;
-        Text buyButtonLabel;
+        TextMeshProUGUI buyButtonLabel;
         Button secondaryButton;
-        Text secondaryButtonLabel;
+        TextMeshProUGUI secondaryButtonLabel;
         Button cancelButton;
-        Text cancelButtonLabel;
+        TextMeshProUGUI cancelButtonLabel;
 
         int activeIndex = -1;
-        RectTransform cardTransform;
 
         public void Init(GameManager owner)
         {
@@ -37,17 +36,16 @@ namespace Tycoon
         public void Build()
         {
             var root = game.Hud.CanvasRoot;
-            var font = game.Font;
 
             popupPanel = UIFactory.CreateFullscreenImage(root, "PopupPanel", new Color(0, 0, 0, 0.65f)).gameObject;
 
-            var card = UIFactory.CreateImage(popupPanel.transform, "Card", new Color(0.12f, 0.13f, 0.18f, 0.98f), Vector2.zero, new Vector2(760, 480));
-            cardTransform = card.rectTransform;
-            popupTitle = UIFactory.CreateText(card.transform, "Title", "", 30, Color.white, new Vector2(0, 170), new Vector2(680, 70), font);
+            var card = UIFactory.CreateBubblePanel(popupPanel.transform, "Card", new Color(0.12f, 0.13f, 0.18f, 0.98f), Vector2.zero, new Vector2(760, 480));
+            card.gameObject.AddComponent<FloatingBubble>();
+            popupTitle = UIFactory.CreateText(card.transform, "Title", "", 30, Color.white, new Vector2(0, 170), new Vector2(680, 70));
 
-            buyButton = UIFactory.CreateButton(card.transform, "BuyButton", new Color(0.2f, 0.7f, 0.3f), new Vector2(0, 40), new Vector2(600, 80), font, out buyButtonLabel);
-            secondaryButton = UIFactory.CreateButton(card.transform, "SecondaryButton", new Color(0.25f, 0.5f, 0.85f), new Vector2(0, -60), new Vector2(600, 80), font, out secondaryButtonLabel);
-            cancelButton = UIFactory.CreateButton(card.transform, "CancelButton", new Color(0.6f, 0.25f, 0.25f), new Vector2(0, -160), new Vector2(600, 80), font, out cancelButtonLabel);
+            buyButton = UIFactory.CreateButton(card.transform, "BuyButton", new Color(0.2f, 0.7f, 0.3f), new Vector2(0, 40), new Vector2(600, 80), out buyButtonLabel);
+            secondaryButton = UIFactory.CreateButton(card.transform, "SecondaryButton", new Color(0.25f, 0.5f, 0.85f), new Vector2(0, -60), new Vector2(600, 80), out secondaryButtonLabel);
+            cancelButton = UIFactory.CreateButton(card.transform, "CancelButton", new Color(0.6f, 0.25f, 0.25f), new Vector2(0, -160), new Vector2(600, 80), out cancelButtonLabel);
 
             popupPanel.SetActive(false);
         }
@@ -69,13 +67,14 @@ namespace Tycoon
 
         public void Open(int index)
         {
-            bool justOpened = !IsOpen || activeIndex != index;
             activeIndex = index;
             var state = game.Plots.plots[index];
             var def = state.definition;
 
+            // SetActive(true) on an already-active object is a no-op, so the
+            // card's FloatingBubble only replays its pop-in on the actual
+            // closed->open transition, not on every RefreshIfOpen() call.
             popupPanel.SetActive(true);
-            if (justOpened) StartCoroutine(PlayOpenAnimation());
 
             // Every branch below assumes both action buttons start visible;
             // only the Rented branch needs to hide both.
@@ -152,23 +151,6 @@ namespace Tycoon
         {
             popupPanel.SetActive(false);
             activeIndex = -1;
-        }
-
-        /// <summary>Quick scale-in punch so the popup feels like it responded to
-        /// the tap instead of just snapping into existence.</summary>
-        IEnumerator PlayOpenAnimation()
-        {
-            const float duration = 0.12f;
-            float elapsed = 0f;
-            while (elapsed < duration)
-            {
-                elapsed += Time.unscaledDeltaTime; // unaffected by pause/speed controls
-                float p = Mathf.Clamp01(elapsed / duration);
-                float eased = 1f - (1f - p) * (1f - p);
-                cardTransform.localScale = Vector3.one * Mathf.Lerp(0.85f, 1f, eased);
-                yield return null;
-            }
-            cardTransform.localScale = Vector3.one;
         }
 
         void ConfirmBuy(int index)

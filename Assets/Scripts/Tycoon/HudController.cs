@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -20,21 +21,21 @@ namespace Tycoon
     {
         GameManager game;
 
-        Text balanceText;
-        Text nextUnlockText;
-        Text profitText;
-        Text netWorthText;
-        public Text calendarText;
-        Text monthlyIncomeText;
-        Text marketTrendText;
+        TextMeshProUGUI balanceText;
+        TextMeshProUGUI nextUnlockText;
+        TextMeshProUGUI profitText;
+        TextMeshProUGUI netWorthText;
+        public TextMeshProUGUI calendarText;
+        TextMeshProUGUI monthlyIncomeText;
+        TextMeshProUGUI marketTrendText;
         Image marketTrendPill;
 
         GameObject eventBannerPanel;
         Image eventBannerBg;
-        Text eventBannerTitle;
-        Text eventBannerSubtitle;
+        TextMeshProUGUI eventBannerTitle;
+        TextMeshProUGUI eventBannerSubtitle;
         Button eventConfirmButton;
-        Text eventConfirmButtonLabel;
+        TextMeshProUGUI eventConfirmButtonLabel;
         CanvasGroup eventBannerGroup;
         Coroutine eventBannerRoutine;
 
@@ -85,7 +86,6 @@ namespace Tycoon
 
             var root = canvasGO.transform;
             CanvasRoot = root;
-            var font = game.Font;
 
             // Top bar is deliberately just ONE slim row - Balance and the date,
             // the two things worth a permanent glance. Everything else used to
@@ -96,13 +96,13 @@ namespace Tycoon
             const float topRowY = 900f;
             const float sideCol = 210f, sideW = 380f;
 
-            var balancePill = UIFactory.CreateImage(root, "BalancePill", new Color(0.1f, 0.11f, 0.15f, 0.95f), new Vector2(-sideCol, topRowY), new Vector2(sideW, 84));
+            var balancePill = UIFactory.CreateBubblePanel(root, "BalancePill", new Color(0.1f, 0.11f, 0.15f, 0.95f), new Vector2(-sideCol, topRowY), new Vector2(sideW, 84));
             UIFactory.CreateIconBadge(root, new Color(0.95f, 0.7f, 0.15f), new Vector2(-sideCol - 148, topRowY), 58);
-            balanceText = UIFactory.CreateText(balancePill.transform, "Balance", "", 28, new Color(1f, 0.92f, 0.45f), new Vector2(30, 0), new Vector2(300, 66), font);
-            balanceText.fontStyle = FontStyle.Bold;
+            balanceText = UIFactory.CreateText(balancePill.transform, "Balance", "", 28, new Color(1f, 0.92f, 0.45f), new Vector2(30, 0), new Vector2(300, 66));
+            balanceText.fontStyle = FontStyles.Bold;
 
-            var calendarPill = UIFactory.CreateImage(root, "CalendarPill", new Color(0.22f, 0.28f, 0.4f, 0.95f), new Vector2(sideCol, topRowY), new Vector2(sideW, 84));
-            calendarText = UIFactory.CreateText(calendarPill.transform, "CalendarText", "", 20, new Color(0.85f, 0.9f, 1f), Vector2.zero, new Vector2(340, 66), font);
+            var calendarPill = UIFactory.CreateBubblePanel(root, "CalendarPill", new Color(0.22f, 0.28f, 0.4f, 0.95f), new Vector2(sideCol, topRowY), new Vector2(sideW, 84));
+            calendarText = UIFactory.CreateText(calendarPill.transform, "CalendarText", "", 20, new Color(0.85f, 0.9f, 1f), Vector2.zero, new Vector2(340, 66));
 
             BuildBottomStats(root);
             BuildSpeedControls(root);
@@ -116,24 +116,22 @@ namespace Tycoon
         /// screen. Same +-400 safety margin as the top bar.</summary>
         void BuildBottomStats(Transform root)
         {
-            var font = game.Font;
-
-            var nextUnlockPill = UIFactory.CreateImage(root, "NextUnlockPill", new Color(0.1f, 0.11f, 0.15f, 0.94f), new Vector2(0, -560f), new Vector2(760, 72));
+            var nextUnlockPill = UIFactory.CreateBubblePanel(root, "NextUnlockPill", new Color(0.1f, 0.11f, 0.15f, 0.94f), new Vector2(0, -560f), new Vector2(760, 72));
             UIFactory.CreateIconBadge(root, new Color(0.55f, 0.85f, 0.4f), new Vector2(-330, -560f), 50);
-            nextUnlockText = UIFactory.CreateText(nextUnlockPill.transform, "NextUnlock", "", 19, new Color(0.78f, 0.96f, 0.68f), new Vector2(28, 0), new Vector2(660, 60), font);
+            nextUnlockText = UIFactory.CreateText(nextUnlockPill.transform, "NextUnlock", "", 19, new Color(0.78f, 0.96f, 0.68f), new Vector2(28, 0), new Vector2(660, 60));
 
-            marketTrendPill = UIFactory.CreateImage(root, "MarketTrendPill", new Color(0.18f, 0.18f, 0.22f, 0.94f), new Vector2(0, -640f), new Vector2(760, 58));
-            marketTrendText = UIFactory.CreateText(marketTrendPill.transform, "MarketTrendText", "", 18, Color.white, Vector2.zero, new Vector2(700, 52), font);
+            marketTrendPill = UIFactory.CreateBubblePanel(root, "MarketTrendPill", new Color(0.18f, 0.18f, 0.22f, 0.94f), new Vector2(0, -640f), new Vector2(760, 58));
+            marketTrendText = UIFactory.CreateText(marketTrendPill.transform, "MarketTrendText", "", 18, Color.white, Vector2.zero, new Vector2(700, 52));
 
             const float chipY = -716f, chipW = 250f;
-            var profitPill = UIFactory.CreateImage(root, "ProfitPill", new Color(0.2f, 0.7f, 0.3f), new Vector2(-260, chipY), new Vector2(chipW, 58));
-            profitText = UIFactory.CreateText(profitPill.transform, "ProfitText", "", 16, Color.white, Vector2.zero, new Vector2(220, 52), font);
+            var profitPill = UIFactory.CreateBubblePanel(root, "ProfitPill", new Color(0.2f, 0.7f, 0.3f), new Vector2(-260, chipY), new Vector2(chipW, 58));
+            profitText = UIFactory.CreateText(profitPill.transform, "ProfitText", "", 16, Color.white, Vector2.zero, new Vector2(220, 52));
 
-            var netWorthPill = UIFactory.CreateImage(root, "NetWorthPill", new Color(0.55f, 0.42f, 0.12f), new Vector2(0, chipY), new Vector2(chipW, 58));
-            netWorthText = UIFactory.CreateText(netWorthPill.transform, "NetWorthText", "", 16, Color.white, Vector2.zero, new Vector2(220, 52), font);
+            var netWorthPill = UIFactory.CreateBubblePanel(root, "NetWorthPill", new Color(0.55f, 0.42f, 0.12f), new Vector2(0, chipY), new Vector2(chipW, 58));
+            netWorthText = UIFactory.CreateText(netWorthPill.transform, "NetWorthText", "", 16, Color.white, Vector2.zero, new Vector2(220, 52));
 
-            var monthlyIncomePill = UIFactory.CreateImage(root, "MonthlyIncomePill", new Color(0.16f, 0.4f, 0.38f), new Vector2(260, chipY), new Vector2(chipW, 58));
-            monthlyIncomeText = UIFactory.CreateText(monthlyIncomePill.transform, "MonthlyIncomeText", "", 16, Color.white, Vector2.zero, new Vector2(220, 52), font);
+            var monthlyIncomePill = UIFactory.CreateBubblePanel(root, "MonthlyIncomePill", new Color(0.16f, 0.4f, 0.38f), new Vector2(260, chipY), new Vector2(chipW, 58));
+            monthlyIncomeText = UIFactory.CreateText(monthlyIncomePill.transform, "MonthlyIncomeText", "", 16, Color.white, Vector2.zero, new Vector2(220, 52));
         }
 
         // Bottom control row sits near the actual bottom of the (now much
@@ -144,22 +142,21 @@ namespace Tycoon
 
         void BuildSpeedControls(Transform root)
         {
-            var font = game.Font;
             speedButtonImages = new Image[3];
-            speedButtonImages[0] = CreateSpeedButton(root, "Speed1x", "▶", new Vector2(-220, BottomRowY), 1f, 0, font);
-            speedButtonImages[1] = CreateSpeedButton(root, "Speed2x", "▶▶", new Vector2(-120, BottomRowY), 2f, 1, font);
+            speedButtonImages[0] = CreateSpeedButton(root, "Speed1x", "▶", new Vector2(-220, BottomRowY), 1f, 0);
+            speedButtonImages[1] = CreateSpeedButton(root, "Speed2x", "▶▶", new Vector2(-120, BottomRowY), 2f, 1);
             // Fastest button jumps to 6x rather than 3x - with secondsPerMonth
             // = 30, that's a 5s/month pace (30/6) instead of 10s (30/3).
-            speedButtonImages[2] = CreateSpeedButton(root, "Speed3x", "▶▶▶", new Vector2(-20, BottomRowY), 6f, 2, font);
+            speedButtonImages[2] = CreateSpeedButton(root, "Speed3x", "▶▶▶", new Vector2(-20, BottomRowY), 6f, 2);
             HighlightSpeed(0);
         }
 
         float lastSpeed = 1f;
         int lastSpeedSlot = 0;
 
-        Image CreateSpeedButton(Transform root, string name, string label, Vector2 pos, float speed, int slot, Font font)
+        Image CreateSpeedButton(Transform root, string name, string label, Vector2 pos, float speed, int slot)
         {
-            var btn = UIFactory.CreateButton(root, name, new Color(0.15f, 0.16f, 0.2f, 0.88f), pos, new Vector2(90, 64), font, out var lbl);
+            var btn = UIFactory.CreateButton(root, name, new Color(0.15f, 0.16f, 0.2f, 0.88f), pos, new Vector2(90, 64), out var lbl);
             lbl.text = label;
             btn.onClick.AddListener(() =>
             {
@@ -182,7 +179,7 @@ namespace Tycoon
         void BuildPauseButton(Transform root)
         {
             bool paused = false;
-            var btn = UIFactory.CreateButton(root, "PauseButton", new Color(0.95f, 0.6f, 0.15f), new Vector2(180, BottomRowY), new Vector2(84, 84), game.Font, out var lbl);
+            var btn = UIFactory.CreateButton(root, "PauseButton", new Color(0.95f, 0.6f, 0.15f), new Vector2(180, BottomRowY), new Vector2(84, 84), out var lbl);
             lbl.fontSize = 30;
             lbl.text = "II";
             btn.onClick.AddListener(() =>
@@ -200,7 +197,10 @@ namespace Tycoon
         /// raycastTarget is ON, so it genuinely blocks input everywhere except its
         /// own button: the event's actual effect (market shift or cash grant)
         /// only happens once the player taps through, not the moment it's
-        /// rolled.</summary>
+        /// rolled. The dim/strobe tint lives on this fullscreen backdrop; the
+        /// actual message sits on a separate floating card on top of it, so
+        /// the banner reads as "a card appeared over a dimmed scene" rather
+        /// than text pasted directly onto a flat color wash.</summary>
         void BuildEventBanner(Transform root)
         {
             eventBannerBg = UIFactory.CreateFullscreenImage(root, "EventBanner", new Color(0f, 0f, 0f, 0f));
@@ -210,11 +210,14 @@ namespace Tycoon
             // Widths capped with the same extra margin as the HUD pills above
             // (not the full 1080 reference width) - safe on real phone aspects
             // narrower than this reference, not just the reference itself.
-            eventBannerTitle = UIFactory.CreateText(eventBannerPanel.transform, "EventTitle", "", 44, Color.white, new Vector2(0, 130), new Vector2(820, 100), game.Font);
-            eventBannerTitle.fontStyle = FontStyle.Bold;
-            eventBannerSubtitle = UIFactory.CreateText(eventBannerPanel.transform, "EventSubtitle", "", 20, Color.white, new Vector2(0, 0), new Vector2(820, 140), game.Font);
+            var card = UIFactory.CreateBubblePanel(eventBannerPanel.transform, "EventCard", new Color(0.12f, 0.13f, 0.18f, 0.98f), Vector2.zero, new Vector2(880, 520));
+            card.gameObject.AddComponent<FloatingBubble>();
 
-            eventConfirmButton = UIFactory.CreateButton(eventBannerPanel.transform, "EventConfirmButton", new Color(0.95f, 0.95f, 0.95f, 0.95f), new Vector2(0, -180), new Vector2(280, 76), game.Font, out eventConfirmButtonLabel);
+            eventBannerTitle = UIFactory.CreateText(card.transform, "EventTitle", "", 44, Color.white, new Vector2(0, 130), new Vector2(800, 100));
+            eventBannerTitle.fontStyle = FontStyles.Bold;
+            eventBannerSubtitle = UIFactory.CreateText(card.transform, "EventSubtitle", "", 20, Color.white, new Vector2(0, 0), new Vector2(800, 140));
+
+            eventConfirmButton = UIFactory.CreateButton(card.transform, "EventConfirmButton", new Color(0.95f, 0.95f, 0.95f, 0.95f), new Vector2(0, -180), new Vector2(280, 76), out eventConfirmButtonLabel);
             eventConfirmButtonLabel.color = new Color(0.15f, 0.14f, 0.13f);
             eventConfirmButtonLabel.fontSize = 26;
 
