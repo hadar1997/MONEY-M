@@ -497,14 +497,16 @@ namespace Tycoon
             return height + 0.14f; // roof cap spans [height, height+0.14] - see BuildBuildingMesh
         }
 
-        /// <summary>Small World Space Canvas pill (soft floating bubble +
-        /// circular trend badge + compact TMP text) above the building - reuses
-        /// the same rounded-rect/circle sprites as the HUD so it matches the
-        /// rest of the UI instead of being a plain 3D quad. Height scales with
-        /// the building's own roofline so it stays visually attached at every
-        /// tier. A gentle world-space bob (small amplitude - this is in world
-        /// units, not screen pixels) makes each sign read as literally
-        /// floating above its building rather than rigidly bolted on.</summary>
+        /// <summary>Small World Space Canvas pill (soft bubble panel + circular
+        /// trend badge + compact TMP text) above the building - reuses the same
+        /// rounded-rect/circle sprites as the HUD so it matches the rest of the
+        /// UI instead of being a plain 3D quad. Height scales with the
+        /// building's own roofline so it stays visually attached at every
+        /// tier. Deliberately does NOT bob/float (unlike the popup/settings/
+        /// event cards) - with many of these on screen at once, independent
+        /// motion per tag made it unclear which price belonged to which
+        /// building; staying pinned directly above it is what keeps that link
+        /// readable.</summary>
         void CreatePriceTag(PropertyTileView view, PropertyDefinition def)
         {
             var tagGO = new GameObject("PriceTag");
@@ -519,14 +521,12 @@ namespace Tycoon
             var canvasRT = canvas.GetComponent<RectTransform>();
             canvasRT.sizeDelta = new Vector2(190, 52);
 
-            // FloatingBubble casts transform to RectTransform, so it can only
-            // go on AFTER Canvas above - Canvas is what actually converts this
-            // GameObject's plain Transform into a RectTransform in the first
-            // place; adding it before that cast would throw.
-            var bob = tagGO.AddComponent<FloatingBubble>();
-            bob.bobAmplitude = 3f; // in the same "UI pixel" space as sizeDelta below - ~0.03 world units once the 0.01 scale above applies
-            bob.bobSpeed = 1.3f;
-
+            // No FloatingBubble bob here (unlike the popup/settings/event
+            // cards) - each tag would bob on its own independent random
+            // phase, so with many buildings on screen at once it read as
+            // ambiguous which price belonged to which building instead of a
+            // deliberate "floating" look. Staying pinned directly above its
+            // building is what actually makes the link readable.
             var pill = UIFactory.CreateBubblePanel(tagGO.transform, "Pill", Color.white, Vector2.zero, new Vector2(180, 46));
             view.priceTagPill = pill;
 
