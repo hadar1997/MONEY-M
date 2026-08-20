@@ -37,13 +37,17 @@ namespace Tycoon
         {
             var root = game.Hud.CanvasRoot;
 
-            // Small gear button on the bottom row, clear of the speed/pause
-            // buttons (which run from x=-220 to x=222) and well inside the
-            // same safety margin the rest of the HUD uses.
+            // Small button on the bottom row, clear of the speed/pause buttons
+            // (which run from x=-220 to x=222) and well inside the same safety
+            // margin the rest of the HUD uses. Plain "Menu" text, not a gear
+            // glyph - the default TMP font asset's atlas is static and doesn't
+            // have the Miscellaneous Symbols block baked in, so a gear
+            // character silently rendered as nothing (same issue as the speed
+            // buttons/trend arrows elsewhere in this UI pass).
             var gearBtn = UIFactory.CreateButton(root, "SettingsButton", new Color(0.2f, 0.2f, 0.24f, 0.88f),
-                new Vector2(300, HudController.BottomRowY), new Vector2(70, 70), out var gearLabel);
-            gearLabel.text = "⚙"; // gear glyph
-            gearLabel.fontSize = 34;
+                new Vector2(300, HudController.BottomRowY), new Vector2(84, 70), out var gearLabel);
+            gearLabel.text = "Menu";
+            gearLabel.fontSize = 18;
             gearBtn.onClick.AddListener(Open);
 
             panel = UIFactory.CreateFullscreenImage(root, "SettingsPanel", new Color(0, 0, 0, 0.65f)).gameObject;

@@ -217,7 +217,11 @@ namespace Tycoon
             state.view.priceTagText.text = text;
             state.view.priceTagPill.color = pillColor;
             state.view.priceTagBadge.color = state.lastDeltaPositive ? TrendUpColor : TrendDownColor;
-            state.view.priceTagArrow.text = state.lastDeltaPositive ? "▲" : "▼";
+            // "^"/"v" not "▲"/"▼" - the default TMP font asset's atlas is
+            // static and doesn't have the Geometric Shapes block baked in, so
+            // those silently rendered as nothing (see HudController's speed
+            // buttons for the same issue and full explanation).
+            state.view.priceTagArrow.text = state.lastDeltaPositive ? "^" : "v";
             if (changed) state.view.PulsePriceTag();
         }
     }

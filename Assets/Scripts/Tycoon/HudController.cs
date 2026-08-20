@@ -56,6 +56,12 @@ namespace Tycoon
             canvasGO.transform.SetParent(transform, false);
             var canvas = canvasGO.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            // Snaps UI elements to whole physical pixels instead of leaving
+            // them at whatever fractional position the ScaleWithScreenSize
+            // scale factor produces - without this, text/edges can look
+            // faintly soft/pixelated purely from sub-pixel positioning, even
+            // though TMP's own glyph rendering is already crisp.
+            canvas.pixelPerfect = true;
             var scaler = canvasGO.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             // Portrait phone reference, not desktop landscape - every pill below
@@ -142,12 +148,17 @@ namespace Tycoon
 
         void BuildSpeedControls(Transform root)
         {
+            // Plain "1x/2x/6x" labels, not repeated ▶ glyphs - the default TMP
+            // font asset's atlas is static and only has ASCII/Latin-1/a little
+            // punctuation baked in (see LiberationSans SDF.asset's
+            // characterSequence), so ▶ silently rendered as nothing at all.
+            // Also just more accurate: the fastest button is 6x, not 3x.
             speedButtonImages = new Image[3];
-            speedButtonImages[0] = CreateSpeedButton(root, "Speed1x", "▶", new Vector2(-220, BottomRowY), 1f, 0);
-            speedButtonImages[1] = CreateSpeedButton(root, "Speed2x", "▶▶", new Vector2(-120, BottomRowY), 2f, 1);
+            speedButtonImages[0] = CreateSpeedButton(root, "Speed1x", "1x", new Vector2(-220, BottomRowY), 1f, 0);
+            speedButtonImages[1] = CreateSpeedButton(root, "Speed2x", "2x", new Vector2(-120, BottomRowY), 2f, 1);
             // Fastest button jumps to 6x rather than 3x - with secondsPerMonth
             // = 30, that's a 5s/month pace (30/6) instead of 10s (30/3).
-            speedButtonImages[2] = CreateSpeedButton(root, "Speed3x", "▶▶▶", new Vector2(-20, BottomRowY), 6f, 2);
+            speedButtonImages[2] = CreateSpeedButton(root, "Speed3x", "6x", new Vector2(-20, BottomRowY), 6f, 2);
             HighlightSpeed(0);
         }
 
@@ -185,7 +196,7 @@ namespace Tycoon
             btn.onClick.AddListener(() =>
             {
                 paused = !paused;
-                lbl.text = paused ? "▶" : "II";
+                lbl.text = paused ? ">" : "II"; // ">" not "▶" - see BuildSpeedControls' comment on TMP glyph coverage
                 // Resume at whatever speed was active before pausing, not a hard
                 // reset to 1x - pausing shouldn't cost the player their 2x/3x pick.
                 Time.timeScale = paused ? 0f : lastSpeed;

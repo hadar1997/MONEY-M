@@ -39,7 +39,10 @@ namespace Tycoon
 
         void Awake()
         {
-            QualitySettings.antiAliasing = 4;
+            // MSAA itself is NOT set here - QualitySettings.antiAliasing is
+            // ignored under URP (it only matters for the legacy render
+            // pipeline); the actual lever is UniversalRenderPipelineAsset's
+            // own MSAA field (Assets/Settings/URP_PipelineAsset.asset).
 
             World = gameObject.AddComponent<WorldBuilder>();
             Economy = gameObject.AddComponent<EconomyManager>();
