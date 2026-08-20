@@ -208,15 +208,21 @@ namespace Tycoon
             vignette.intensity.Override(0.15f);
             vignette.smoothness.Override(0.8f);
 
-            // Focus band centered on the map (which sits cameraDistance units
-            // in front of the camera); kept wide/gentle so world-space price
-            // tags near the focus plane stay legible - this is meant to read
-            // as a soft depth cue at the scene's edges, not a strong blur.
+            // Gaussian DoF here only blurs pixels FARTHER than gaussianStart -
+            // there's no near-side blur. gaussianStart used to sit at
+            // cameraDistance-2 (11), but building rooftops (and their price
+            // tags, sitting higher still) are measurably CLOSER to the camera
+            // than their base along the view axis at this pitch - tall/corner
+            // buildings' rooflines were landing inside the blur band, which
+            // read as a persistently soft/pixelated scene rather than the
+            // intended subtle "photo of a miniature" hint at the far edges.
+            // Pushed well past the board's actual depth range so the whole
+            // playable area stays sharp, and the max radius is a lot gentler.
             var dof = profile.Add<DepthOfField>(true);
             dof.mode.Override(DepthOfFieldMode.Gaussian);
-            dof.gaussianStart.Override(cameraDistance - 2f);
-            dof.gaussianEnd.Override(cameraDistance + 6f);
-            dof.gaussianMaxRadius.Override(0.5f);
+            dof.gaussianStart.Override(cameraDistance + 5f);
+            dof.gaussianEnd.Override(cameraDistance + 15f);
+            dof.gaussianMaxRadius.Override(0.15f);
 
             var volumeGO = new GameObject("PostProcessVolume");
             volumeGO.transform.SetParent(transform, false);

@@ -28,6 +28,19 @@ namespace Tycoon
 
         int activeIndex = -1;
 
+        // Which (plot, ownership) the buttons' listeners currently match -
+        // RefreshIfOpen calls Open() every single frame the popup is open
+        // (the market keeps ticking, so displayed price/interactable state
+        // needs to stay live), but re-binding a button's onClick tears down
+        // and reallocates a closure every time even when nothing about which
+        // action it performs actually changed - real GC churn 60x/second for
+        // as long as a popup sits open. Listeners now only get rebuilt when
+        // the plot or its ownership state actually transitions; text/
+        // interactable still update unconditionally every call since those
+        // genuinely can change frame to frame (live market value, balance).
+        int boundIndex = -1;
+        PropertyOwnership boundOwnership;
+
         public void Init(GameManager owner)
         {
             game = owner;
@@ -76,6 +89,10 @@ namespace Tycoon
             // closed->open transition, not on every RefreshIfOpen() call.
             popupPanel.SetActive(true);
 
+            bool needsRebind = boundIndex != index || boundOwnership != state.ownership;
+            boundIndex = index;
+            boundOwnership = state.ownership;
+
             // Every branch below assumes both action buttons start visible;
             // only the Rented branch needs to hide both.
             buyButton.gameObject.SetActive(true);
@@ -89,8 +106,11 @@ namespace Tycoon
                 secondaryButton.gameObject.SetActive(false);
 
                 cancelButtonLabel.text = "Close";
-                cancelButton.onClick.RemoveAllListeners();
-                cancelButton.onClick.AddListener(Close);
+                if (needsRebind)
+                {
+                    cancelButton.onClick.RemoveAllListeners();
+                    cancelButton.onClick.AddListener(Close);
+                }
                 return;
             }
 
@@ -112,22 +132,28 @@ namespace Tycoon
 
                 buyButtonLabel.text = $"Sell for {EconomyManager.FormatMoney(sellPrice)}";
                 buyButton.interactable = true;
-                buyButton.onClick.RemoveAllListeners();
-                buyButton.onClick.AddListener(() => ConfirmSell(index));
 
                 secondaryButtonLabel.text = needsDecision
                     ? $"Renew lease - {EconomyManager.FormatMoney(monthlyRent)}/mo"
                     : $"Lease out - {EconomyManager.FormatMoney(monthlyRent)}/mo";
                 secondaryButton.interactable = true;
-                secondaryButton.onClick.RemoveAllListeners();
-                secondaryButton.onClick.AddListener(() => SignLease(index));
 
                 cancelButtonLabel.text = needsDecision ? "Keep holding" : "Cancel";
-                cancelButton.onClick.RemoveAllListeners();
-                if (needsDecision)
-                    cancelButton.onClick.AddListener(() => KeepHolding(index));
-                else
-                    cancelButton.onClick.AddListener(Close);
+
+                if (needsRebind)
+                {
+                    buyButton.onClick.RemoveAllListeners();
+                    buyButton.onClick.AddListener(() => ConfirmSell(index));
+
+                    secondaryButton.onClick.RemoveAllListeners();
+                    secondaryButton.onClick.AddListener(() => SignLease(index));
+
+                    cancelButton.onClick.RemoveAllListeners();
+                    if (needsDecision)
+                        cancelButton.onClick.AddListener(() => KeepHolding(index));
+                    else
+                        cancelButton.onClick.AddListener(Close);
+                }
                 return;
             }
 
@@ -136,15 +162,20 @@ namespace Tycoon
             popupTitle.text = def.displayName;
 
             buyButtonLabel.text = $"Buy for {EconomyManager.FormatMoney(buyPrice)}";
-            buyButton.interactable = game.Economy.balance >= buyPrice;
-            buyButton.onClick.RemoveAllListeners();
-            buyButton.onClick.AddListener(() => ConfirmBuy(index));
+            buyButton.interactable = game.Economy.balance >= buyPrice; // can flip every frame (balance changes) without an ownership transition, so this stays outside the rebind gate
 
             secondaryButton.gameObject.SetActive(false);
 
             cancelButtonLabel.text = "Cancel";
-            cancelButton.onClick.RemoveAllListeners();
-            cancelButton.onClick.AddListener(Close);
+
+            if (needsRebind)
+            {
+                buyButton.onClick.RemoveAllListeners();
+                buyButton.onClick.AddListener(() => ConfirmBuy(index));
+
+                cancelButton.onClick.RemoveAllListeners();
+                cancelButton.onClick.AddListener(Close);
+            }
         }
 
         public void Close()
