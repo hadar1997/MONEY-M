@@ -19,6 +19,7 @@ namespace Tycoon
 
         RectTransform rt;
         Vector2 basePos;
+        Vector3 baseScale;
         float phase;
         float popElapsed;
 
@@ -30,9 +31,16 @@ namespace Tycoon
         void OnEnable()
         {
             basePos = rt.anchoredPosition;
+            // Captured, not assumed to be Vector3.one - WorldBuilder's price
+            // tags deliberately sit at localScale 0.01 (their whole "UI pixel"
+            // canvas is scaled down to world-space size); hard-coding
+            // Vector3.one here used to stomp that down-scale the moment a
+            // price tag's FloatingBubble activated, making the tag render
+            // ~100x too big and swallow the whole map.
+            baseScale = rt.localScale;
             phase = Random.value * Mathf.PI * 2f; // per-instance offset so bubbles don't all bob in lockstep
             popElapsed = 0f;
-            rt.localScale = Vector3.one * 0.85f;
+            rt.localScale = baseScale * 0.85f;
         }
 
         void Update()
@@ -45,7 +53,7 @@ namespace Tycoon
                 popElapsed += Time.unscaledDeltaTime;
                 float p = Mathf.Clamp01(popElapsed / popDuration);
                 float eased = 1f - (1f - p) * (1f - p) * (1f - p); // ease-out cubic
-                rt.localScale = Vector3.one * Mathf.Lerp(0.85f, 1f, eased);
+                rt.localScale = baseScale * Mathf.Lerp(0.85f, 1f, eased);
             }
         }
     }
